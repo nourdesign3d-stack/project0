@@ -6,6 +6,9 @@ import ws from "ws";
 import { PrismaClient } from "./generated/client";
 import { keys } from "./keys";
 
+// Motif standard du singleton Prisma : l'objet global n'est pas typé, la conversion
+// est le seul moyen d'y attacher le client.
+// nosemgrep: project0-no-ts-suppression
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 neonConfig.webSocketConstructor = ws;

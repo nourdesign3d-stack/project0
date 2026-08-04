@@ -1,7 +1,12 @@
 {
   "extends": "@repo/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": "."
+    "baseUrl": ".",
+    // Storybook is never published, so declaration emit is irrelevant here.
+    // Keeping it on surfaces TS2742 portability errors for Radix types that
+    // are transitive dependencies of @repo/design-system.
+    "declaration": false,
+    "declarationMap": false
   },
   "include": [
     "next-env.d.ts",

@@ -1,0 +1,73 @@
+# Règles Semgrep propres au projet.
+# Elles ne remplacent ni les packs officiels (p/typescript, p/react, p/secrets,
+# p/owasp-top-ten) ni la revue humaine : elles vérifient des invariants documentés
+# dans .claude/rules/ que les packs génériques ne connaissent pas.
+#
+# Toute règle ajoutée ici doit correspondre à un invariant réellement vérifiable.
+# Une règle trop bruyante est un bug : on la corrige ou on la supprime.
+
+rules:
+  - id: project0-no-ts-suppression
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Suppression d'erreur TypeScript. Interdite sans justification écrite
+      (.claude/rules/quality.md). Corriger le type plutôt que le masquer.
+    patterns:
+      - pattern-regex: "@ts-ignore|as\\s+unknown\\s+as"
+    paths:
+      exclude:
+        - "**/node_modules/**"
+        - "packages/design-system/components/ui/**"
+        - "packages/database/generated/**"
+
+  - id: project0-no-dangerous-html
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      dangerouslySetInnerHTML rend du HTML non échappé. Le contenu CMS et toute
+      entrée externe sont non fiables (.claude/rules/security.md). Assainir explicitement
+      ou utiliser un rendu Markdown sûr.
+    pattern: <$EL dangerouslySetInnerHTML={...} />
+    paths:
+      exclude:
+        - "**/node_modules/**"
+        - "packages/design-system/components/ui/**"
+
+  - id: project0-no-skipped-tests
+    languages: [typescript]
+    severity: WARNING
+    message: >-
+      Test désactivé. Un test ne se met pas en `skip` pour faire passer la CI
+      (.claude/rules/quality.md) : le corriger, ou le supprimer avec justification.
+    patterns:
+      - pattern-either:
+          - pattern: describe.skip(...)
+          - pattern: it.skip(...)
+          - pattern: test.skip(...)
+    paths:
+      include:
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.test.tsx"
+      exclude:
+        - "e2e/**"
+
+  - id: project0-no-env-in-client-component
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Variable d'environnement serveur lue dans un fichier marqué "use client".
+      Seules les variables NEXT_PUBLIC_* peuvent atteindre le client
+      (.claude/rules/architecture.md).
+    patterns:
+      - pattern-inside: |
+          "use client"
+          ...
+      - pattern: process.env.$VAR
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: "^(?!NEXT_PUBLIC_)[A-Z0-9_]+$"
+    paths:
+      exclude:
+        - "**/node_modules/**"

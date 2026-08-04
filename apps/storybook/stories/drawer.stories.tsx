@@ -9,6 +9,7 @@ import {
   DrawerTrigger,
 } from "@repo/design-system/components/ui/drawer";
 import type { Meta, StoryObj } from "@storybook/react";
+import type { ComponentProps } from "react";
 
 /**
  * A drawer component for React.
@@ -49,7 +50,9 @@ const meta: Meta<typeof Drawer> = {
 
 export default meta;
 
-type Story = StoryObj<typeof meta>;
+// `Meta<typeof Drawer>` infers `never` args from vaul's union props, which
+// makes `args` a required property. Type the story on the component props.
+type Story = StoryObj<ComponentProps<typeof Drawer>>;
 
 /**
  * The default form of the drawer.

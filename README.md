@@ -1,140 +1,90 @@
-# ▲ / next-forge
+# project0
 
-**Production-grade Turborepo template for Next.js apps.**
+Monorepo Turborepo basé sur [next-forge](https://github.com/vercel/next-forge) v6
+(Next.js 16, React 19, TypeScript 5.9, Prisma 7, pnpm 10).
 
-<div>
-  <img src="https://img.shields.io/npm/dy/next-forge" alt="" />
-  <img src="https://img.shields.io/npm/v/next-forge" alt="" />
-  <img src="https://img.shields.io/github/license/vercel/next-forge" alt="" />
-</div>
+> Le produit n'a pas encore de périmètre métier défini : voir
+> [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md).
 
-## Overview
+## Démarrer
 
-[next-forge](https://github.com/vercel/next-forge) is a production-grade [Turborepo](https://turborepo.com) template for [Next.js](https://nextjs.org/) apps. It's designed to be a comprehensive starting point for building SaaS applications, providing a solid, opinionated foundation with minimal configuration required.
-
-Built on a decade of experience building web applications, next-forge balances speed and quality to help you ship thoroughly-built products faster.
-
-### Philosophy
-
-next-forge is built around five core principles:
-
-- **Fast** — Quick to build, run, deploy, and iterate on
-- **Cheap** — Free to start with services that scale with you
-- **Opinionated** — Integrated tooling designed to work together
-- **Modern** — Latest stable features with healthy community support
-- **Safe** — End-to-end type safety and robust security posture
-
-## Demo
-
-Experience next-forge in action:
-
-- [Web](https://demo.next-forge.com) — Marketing website
-- [App](https://app.demo.next-forge.com) — Main application
-- [Storybook](https://storybook.demo.next-forge.com) — Component library
-- [API](https://api.demo.next-forge.com/health) — API health check
-
-## Features
-
-next-forge comes with batteries included:
-
-### Apps
-
-- **Web** — Marketing site built with Tailwind CSS and TWBlocks
-- **App** — Main application with authentication and database integration
-- **API** — RESTful API with health checks and monitoring
-- **Docs** — Documentation site powered by Mintlify
-- **Email** — Email templates with React Email
-- **Storybook** — Component development environment
-
-### Packages
-
-- **Authentication** — Powered by [Clerk](https://clerk.com)
-- **Database** — Type-safe ORM with migrations
-- **Design System** — Comprehensive component library with dark mode
-- **Payments** — Subscription management via [Stripe](https://stripe.com)
-- **Email** — Transactional emails via [Resend](https://resend.com)
-- **Analytics** — Web ([Google Analytics](https://developers.google.com/analytics)) and product ([Posthog](https://posthog.com))
-- **Observability** — Error tracking ([Sentry](https://sentry.io)), logging, and uptime monitoring ([BetterStack](https://betterstack.com))
-- **Security** — Application security ([Arcjet](https://arcjet.com)), rate limiting, and secure headers
-- **CMS** — Type-safe content management for blogs and documentation
-- **SEO** — Metadata management, sitemaps, and JSON-LD
-- **AI** — AI integration utilities
-- **Webhooks** — Inbound and outbound webhook handling
-- **Collaboration** — Real-time features with avatars and live cursors
-- **Feature Flags** — Feature flag management
-- **Cron** — Scheduled job management
-- **Storage** — File upload and management
-- **Internationalization** — Multi-language support
-- **Notifications** — In-app notification system
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- [Bun](https://bun.sh) (or npm/yarn/pnpm)
-- [Stripe CLI](https://docs.stripe.com/stripe-cli) for local webhook testing
-
-### Installation
-
-Create a new next-forge project:
-
-```sh
-npx next-forge@latest init
+```bash
+pnpm install
+docker compose up -d          # Postgres local
+cp apps/app/.env.example apps/app/.env.local   # puis renseigner les variables
+pnpm dev
 ```
 
-### Setup
+Variables réellement requises : `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`,
+`NEXT_PUBLIC_WEB_URL`. Une variable optionnelle laissée à `""` échoue la validation :
+la commenter. Détail dans [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
-1. Configure your environment variables
-2. Set up required service accounts (Clerk, Stripe, Resend, etc.)
-3. Run the development server
+Ports : `app` 3000 · `web` 3001 · `api` 3002 · `email` 3003 · `docs` 3004 ·
+`studio` 3005 · `storybook` 6006.
 
-For detailed setup instructions, read the [documentation](https://www.next-forge.com/docs).
+## Commandes
+
+| But | Commande |
+| --- | --- |
+| Lint / format | `pnpm lint` · `pnpm format` |
+| Typecheck | `pnpm typecheck` |
+| Tests | `pnpm test` |
+| Build | `pnpm build` (complet) · `pnpm build --filter=app... --filter=api...` |
+| E2E | `pnpm e2e` (navigateurs : `pnpm e2e:install`) |
+| Sécurité statique | `pnpm semgrep` |
+| Chaîne complète | `pnpm verify` |
+| Graphe de dépendances | `pnpm graph` |
+| Frontières | `pnpm boundaries` |
+| Migrations | `pnpm migrate` · `pnpm migrate:deploy` · `pnpm migrate:status` |
+
+`pnpm build` complet nécessite `BASEHUB_TOKEN` (build de `@repo/cms`, requis par `apps/web`).
 
 ## Structure
 
-next-forge uses a monorepo structure managed by Turborepo:
-
 ```
-next-forge/
-├── apps/           # Deployable applications
-│   ├── web/        # Marketing website (port 3001)
-│   ├── app/        # Main application (port 3000)
-│   ├── api/        # API server
-│   ├── docs/       # Documentation
-│   ├── email/      # Email templates
-│   └── storybook/  # Component library
-└── packages/       # Shared packages
-    ├── design-system/
-    ├── database/
-    ├── auth/
-    └── ...
+apps/       app · web · api · email · docs · studio · storybook
+packages/   auth · database · design-system · observability · security · payments · …
+docs/       connaissance du projet (architecture, sécurité, décisions, risques)
+e2e/        tests Playwright des parcours critiques
+.claude/    règles, procédures et réglages pour les agents
 ```
 
-Each app is self-contained and independently deployable. Packages are shared across apps for consistency and maintainability.
+Détail des responsabilités : [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
+## Intégrations fournies par le template
+
+Clerk (authentification), Prisma + Neon (données), Stripe (paiement), BaseHub (CMS),
+Resend (e-mail), Knock (notifications), Liveblocks (collaboration), PostHog / Google
+Analytics, Arcjet + Nosecone (sécurité), Upstash (limitation de débit), Svix (webhooks
+sortants), Sentry + BetterStack (observabilité), Vercel Blob (stockage).
+
+Toutes sont **câblées mais inertes** tant que leurs clés ne sont pas fournies.
+
+## Contribuer
+
+Lire d'abord [`AGENTS.md`](./AGENTS.md) (principes non négociables) et
+[`CLAUDE.md`](./CLAUDE.md) (boucle de travail et commandes).
+
+Contrôles obligatoires selon le type de changement :
+[`docs/QUALITY_GATES.md`](./docs/QUALITY_GATES.md).
 
 ## Documentation
 
-Full documentation is available at [next-forge.com/docs](https://www.next-forge.com/docs), including:
+| Document | Contenu |
+| --- | --- |
+| [PROJECT_CONTEXT](./docs/PROJECT_CONTEXT.md) | objectif, périmètre, outillage, environnements |
+| [ARCHITECTURE](./docs/ARCHITECTURE.md) | applications, packages, flux, frontières |
+| [DOMAIN_MODEL](./docs/DOMAIN_MODEL.md) | acteurs, entités, règles métier (à définir) |
+| [DATA_DICTIONARY](./docs/DATA_DICTIONARY.md) | données, sensibilité, conservation |
+| [SECURITY_MODEL](./docs/SECURITY_MODEL.md) | actifs, menaces, contrôles |
+| [QUALITY_GATES](./docs/QUALITY_GATES.md) | contrôles par type de changement |
+| [DEPLOYMENT](./docs/DEPLOYMENT.md) | CI, variables, migrations, récupération |
+| [ASSUMPTIONS](./docs/ASSUMPTIONS.md) | hypothèses en attente de validation |
+| [RISKS](./docs/RISKS.md) | risques connus et leur statut |
+| [DECISIONS](./docs/DECISIONS.md) | décisions structurantes et justifications |
 
-- Detailed setup guides
-- Package documentation
-- Migration guides for swapping providers
-- Deployment instructions
-- Examples and recipes
+## Amont
 
-## Contributing
-
-We welcome contributions! See the [contributing guide](https://github.com/vercel/next-forge/blob/main/.github/CONTRIBUTING.md) for details.
-
-## Contributors
-
-<a href="https://github.com/vercel/next-forge/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=vercel/next-forge" />
-</a>
-
-Made with [contrib.rocks](https://contrib.rocks).
-
-## License
-
-MIT
+Le template next-forge est maintenu par Vercel sous licence MIT.
+Mise à jour du template : `npx next-forge@latest update` (à relire, la dérive de versions
+est réelle — voir [`docs/DECISIONS.md`](./docs/DECISIONS.md)).

@@ -1,3 +1,24 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# --- Durcissement de la chaîne d'approvisionnement (pnpm >= 10.26) ---
+# Motivé par les règles Semgrep p/owasp-top-ten sur les gestionnaires de paquets.
+
+# `minimumReleaseAge` est volontairement absent.
+# Essayé à 10080 (7 jours) : `pnpm install` échoue dès qu'une dépendance transitive
+# n'a qu'une version récente (constaté avec @rollup/rollup-freebsd-arm64 via
+# @sentry/nextjs), ce qui rend l'installation non reproductible.
+# Le délai de latence est appliqué là où les nouvelles versions entrent réellement :
+# `cooldown: default-days: 7` dans .github/dependabot.yml, le lockfile faisant foi.
+# nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
+
+# Empêche une mise à jour de dépendance d'abaisser les réglages de sécurité.
+trustPolicy: no-downgrade
+
+# Interdit l'installation de dépendances transitives depuis des sources exotiques
+# (git, tarball distant) plutôt que depuis le registre.
+blockExoticSubdeps: true
+# Les scripts d'installation (postinstall) restent bloqués par défaut (pnpm 10).
+# Le dépôt se construit sans eux — vérifié : `prisma generate`, `next build`.
+# N'ajouter `onlyBuiltDependencies` que si un besoin réel apparaît, paquet par paquet.

@@ -277,3 +277,14 @@ packages/database/generated
 .contentlayer
 .content-collections
 .source
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
+# Rapports de graphe de dépendances (régénérables via `pnpm graph`)
+/docs/graph/
+
+# Claude Code — préférences locales, jamais partagées
+.claude/settings.local.json

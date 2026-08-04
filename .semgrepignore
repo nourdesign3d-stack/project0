@@ -1,0 +1,24 @@
+# Exclusions Semgrep — chaque entrée est justifiée.
+# Une exclusion ne doit jamais masquer un problème critique dans du code que nous écrivons.
+
+# Dépendances et artefacts de build : code non écrit ici, non déployé tel quel.
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+coverage/
+
+# Client Prisma généré : régénéré à chaque build, non modifiable à la main.
+packages/database/generated/
+
+# Types générés par le CMS.
+packages/cms/basehub-types.d.ts
+
+# Composants shadcn/ui régénérables par `pnpm bump-ui` : ce ne sont pas nos sources.
+# Toute correction faite ici serait écrasée à la prochaine régénération.
+packages/design-system/components/ui/
+
+# Rapports de test : peuvent contenir des traces, jamais du code applicatif.
+playwright-report/
+test-results/

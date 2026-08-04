@@ -1,0 +1,63 @@
+---
+description: CI, environnements, variables, observabilité, rollback.
+globs: [".github/**", "compose.yaml", "apps/*/vercel.json", "**/*.env.example"]
+---
+
+# Règles de déploiement
+
+## CI (`.github/workflows/ci.yml`)
+
+Chaîne exécutée sur `push` et `pull_request` :
+
+```
+setup (pnpm + cache) → prisma generate → lint → typecheck → test → build (app, api) → semgrep
+```
+
+- Les jobs utilisent `pnpm install --frozen-lockfile` : le lockfile fait foi.
+- Permissions GitHub Actions minimales (`contents: read` par défaut).
+- Actions tierces épinglées à un tag de version majeure maintenue.
+- **Aucun `|| true`**, aucune étape masquant un échec. Une étape non bloquante doit être
+  nommée `(informatif)` et justifiée dans ce fichier.
+- Le job E2E Playwright et le build complet (`apps/web`, `@repo/cms`) dépendent de secrets
+  externes : ils ne s'activent que si la variable de dépôt correspondante est positionnée
+  (`ENABLE_E2E`, `ENABLE_FULL_BUILD`). Cette conditionnalité est un choix explicite, pas un
+  contournement.
+
+## Environnements
+
+| Environnement | Usage |
+| --- | --- |
+| local | `.env.local` par app, Postgres via `docker compose` |
+| preview | déploiement par PR, données non réelles |
+| production | données réelles — jamais utilisée comme environnement de test |
+
+- Une variable **requise** manquante doit faire échouer le démarrage (validation Zod
+  `@t3-oss/env-nextjs`), pas produire un comportement dégradé silencieux.
+- Une variable optionnelle laissée à `""` échoue la validation : la commenter.
+- Variables réellement requises : `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`,
+  `NEXT_PUBLIC_WEB_URL`. Toutes les autres sont optionnelles côté schéma — voir
+  `docs/DEPLOYMENT.md`.
+
+## Observabilité
+
+- Sentry est câblé dans `packages/observability` et activé uniquement quand `VERCEL`
+  est défini (`apps/*/next.config.ts`). Sans DSN, l'application fonctionne normalement.
+- Les logs passent par `packages/observability` (BetterStack optionnel).
+- Un changement significatif doit être constatable : erreur remontée, log utile, ou
+  métrique — sans donnée sensible.
+
+## Livraison
+
+- Le déploiement du code et l'activation d'une fonctionnalité risquée sont séparés
+  (feature flags, `packages/feature-flags`).
+- Migration avant code pour les changements « expand » ; jamais de migration destructive
+  dans la même release que le changement de code qui en dépend.
+- Toute release doit avoir un chemin de retour : rollback du déploiement **ou**
+  roll-forward documenté. Si aucun des deux n'est possible, le dire avant de livrer.
+- Procédure de contrôle avant livraison : `/release-readiness`.
+
+## Interdits
+
+- Modifier la production, ses données ou ses variables depuis une session de développement.
+- Déclencher un déploiement sans autorisation explicite.
+- Ajouter un secret dans un workflow, un artefact, un rapport ou un log.

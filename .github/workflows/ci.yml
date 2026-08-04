@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Permissions minimales : les jobs de validation ne font que lire le dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Valeurs factices, non secrètes, uniquement destinées à satisfaire la validation
+  # des variables d'environnement pendant le build. Aucune connexion réelle n'est établie.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  NEXT_PUBLIC_WEB_URL: http://localhost:3001
+  VERCEL_PROJECT_PRODUCTION_URL: localhost:3000
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (lockfile figé)
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @repo/database run build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit & integration tests
+        run: pnpm test
+
+      # Build restreint aux apps qui ne dépendent pas d'un service tiers.
+      # Le build complet (apps/web → @repo/cms → BaseHub) est dans le job `build-full`.
+      - name: Build (app, api)
+        run: pnpm build --filter=app... --filter=api...
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Semgrep scan
+        run: semgrep ci
+        env:
+          SEMGREP_RULES: >-
+            p/typescript
+            p/react
+            p/secrets
+            p/owasp-top-ten
+            .semgrep/rules
+
+  build-full:
+    name: Build complet (services tiers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Nécessite BASEHUB_TOKEN. À activer via la variable de dépôt ENABLE_FULL_BUILD=true
+    # une fois le secret configuré. Voir docs/DEPLOYMENT.md.
+    if: vars.ENABLE_FULL_BUILD == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @repo/database run build
+      - name: Build
+        run: pnpm build
+        env:
+          BASEHUB_TOKEN: ${{ secrets.BASEHUB_TOKEN }}
+
+  e2e:
+    name: Playwright (parcours critiques)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Nécessite une application démarrable (clés de service). À activer via la variable
+    # de dépôt ENABLE_E2E=true. Voir docs/DEPLOYMENT.md.
+    if: vars.ENABLE_E2E == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @repo/database run build
+      - run: pnpm e2e:install
+      - name: Playwright
+        run: pnpm e2e
+        env:
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      # Les rapports peuvent contenir des captures d'écran : ne jamais y laisser de secret.
+      - name: Rapport Playwright
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

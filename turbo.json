@@ -17,6 +17,9 @@
     "test": {
       "dependsOn": ["^test"]
     },
+    "typecheck": {
+      "dependsOn": ["@repo/database#build"]
+    },
     "analyze": {
       "dependsOn": ["^analyze"]
     },

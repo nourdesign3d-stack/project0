@@ -60,10 +60,14 @@ export default authMiddleware(async (_auth, request, event) => {
 
   // Then run composed middleware (i18n + arcjet)
   const middlewareResponse = await composedMiddleware(
+    // La requête fournie par Clerk n'expose pas le type NextRequest attendu par
+    // createNEMO ; conversion imposée par next-forge.
+    // nosemgrep: project0-no-ts-suppression
     request as unknown as NextRequest,
     event
   );
 
   // Return middleware response if it exists, otherwise headers response
   return middlewareResponse || headersResponse;
+  // nosemgrep: project0-no-ts-suppression -- même motif que apps/app/proxy.ts.
 }) as unknown as NextProxy;

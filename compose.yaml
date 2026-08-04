@@ -1,0 +1,49 @@
+# Environnement local reproductible.
+#
+# N'inclut que les services que le code utilise réellement en local :
+#  - Postgres : cible de `DATABASE_URL` (en production : Neon).
+#
+# Volontairement absents :
+#  - Redis : `packages/rate-limit` parle à l'API REST d'Upstash, pas à un Redis local.
+#  - MinIO : `packages/storage` utilise Vercel Blob, pas un client S3 générique.
+#  - SMTP local : les e-mails passent par Resend ; la prévisualisation se fait
+#    avec `pnpm dev --filter=email` (port 3003).
+# Ajouter un service ici uniquement quand le code sait réellement s'en servir.
+#
+# Aucun secret de production ne doit figurer dans ce fichier.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: project0-postgres
+    restart: unless-stopped
+    environment:
+      # Identifiants de développement local uniquement.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: project0
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d project0"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: project0-postgres-data
+# Utilisation
+#   docker compose up -d        démarrer
+#   docker compose ps           état
+#   docker compose logs -f      journaux
+#   docker compose down         arrêter (les données sont conservées)
+#
+# Remise à zéro — DESTRUCTIF, jamais automatique, jamais en partagé :
+#   docker compose down -v      supprime le volume et donc toutes les données locales
+#
+# DATABASE_URL correspondante :
+#   postgresql://postgres:postgres@localhost:5432/project0

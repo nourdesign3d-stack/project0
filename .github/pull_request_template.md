@@ -1,24 +1,47 @@
 ## Description
 
-Please provide a brief description of the changes introduced in this pull request.
+Besoin traité et critères d'acceptation vérifiés.
 
-## Related Issues
+## Issues liées
 
 Closes #<issue_number>
 
-## Checklist
+## Périmètre
 
-- [ ] My code follows the code style of this project.
-- [ ] I have performed a self-review of my code.
-- [ ] I have commented my code, particularly in hard-to-understand areas.
-- [ ] I have updated the documentation, if necessary.
-- [ ] I have added tests that prove my fix is effective or my feature works.
-- [ ] New and existing tests pass locally with my changes.
+- Applications / packages touchés :
+- Contrats modifiés (routes, actions, exports de packages, schéma Prisma) :
+- Migration incluse : oui / non
 
-## Screenshots (if applicable)
+## Contrôles exécutés
 
-<!-- Add screenshots to help explain your changes, especially if this is a UI-related PR. -->
+Cocher uniquement ce qui a **réellement** été exécuté ; indiquer le reste en « non vérifié ».
 
-## Additional Notes
+- [ ] `pnpm lint`
+- [ ] `pnpm typecheck`
+- [ ] `pnpm test`
+- [ ] `pnpm build --filter=<app>...`
+- [ ] `pnpm semgrep` (si frontière serveur touchée)
+- [ ] `pnpm e2e` (si parcours critique touché)
+- [ ] `pnpm migrate:status` (si migration)
 
-<!-- Add any additional information or context about the pull request here. -->
+## Sécurité et données
+
+- [ ] Entrées validées (Zod) aux frontières
+- [ ] Autorisation vérifiée **côté serveur**, filtre de tenant présent
+- [ ] Tests des cas de **refus** ajoutés
+- [ ] Aucun secret ajouté (code, logs, artefacts, captures)
+- [ ] Migration versionnée, progressive, avec chemin de récupération
+
+## Exploitation
+
+- [ ] Changement observable (erreur remontée, log utile, sans donnée sensible)
+- [ ] Nouvelle variable d'environnement documentée dans `docs/DEPLOYMENT.md`
+- [ ] Chemin de retour possible (rollback ou roll-forward), ou risque déclaré ci-dessous
+
+## Non vérifié / risques résiduels
+
+<!-- Obligatoire. Écrire « aucun » si c'est réellement le cas. -->
+
+## Captures (si applicable)
+
+<!-- Ne jamais inclure de donnée réelle ni de secret dans une capture. -->
