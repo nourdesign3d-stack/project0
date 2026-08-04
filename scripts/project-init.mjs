@@ -17,6 +17,7 @@
  * Ces étapes restent des décisions humaines : elles sont rappelées à la fin.
  */
 
+import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
@@ -145,24 +146,40 @@ for (const action of actions) {
   out.write(`    ${args.dryRun ? "modifierait" : "écrit"}  ${action}\n`);
 }
 
+// 6. Fichiers .env.local : générés depuis les .env.example, jamais écrasés.
+if (!args.dryRun) {
+  const setupEnv = join(root, "scripts/setup-env.mjs");
+  if (existsSync(setupEnv)) {
+    out.write("\n  Fichiers d'environnement :\n");
+    execFileSync(process.execPath, [setupEnv], { cwd: root, stdio: "inherit" });
+  }
+}
+
 out.write(`
-  Étapes restantes (manuelles, par décision) :
+  Étapes restantes — celles qui demandent une décision, pas une commande :
 
-    1. Historique Git — repartir de zéro si la copie ne doit rien hériter :
+    1. Historique Git. Repartir de zéro si la copie ne doit rien hériter :
          rm -rf .git && git init && git add -A && git commit -m "chore: initialisation"
-       Sinon, vérifier le remote : git remote -v
+       Puis le dépôt distant :
+         gh repo create ${name} --private --source=. --remote=origin --push
 
-    2. pnpm install && pnpm hooks:install
+    2. pnpm install
+       (active les hooks Git au passage, via le script \`prepare\`)
 
     3. docker compose up -d
-       Port ${port} : vérifier qu'il est libre (lsof -nP -iTCP:${port} -sTCP:LISTEN)
+       Port ${port} : vérifier qu'il est libre — lsof -nP -iTCP:${port} -sTCP:LISTEN
 
-    4. Renseigner les .env.local des apps (DATABASE_URL, NEXT_PUBLIC_APP_URL,
-       NEXT_PUBLIC_WEB_URL au minimum) — voir docs/DEPLOYMENT.md
+    4. pnpm verify
 
-    5. pnpm verify   puis   pnpm graph
+    5. Clés de service, au fur et à mesure : décommenter les variables voulues
+       dans les .env.local. Sans clé Clerk, l'application démarre mais les pages
+       d'authentification ne s'affichent pas. Voir docs/DEPLOYMENT.md.
 
-    6. Relire docs/ARCHITECTURE.md, SECURITY_MODEL.md, QUALITY_GATES.md et
-       DEPLOYMENT.md : ils décrivent le squelette, pas encore votre produit.
+    6. Décisions de fond, à ne pas repousser :
+         - quelles intégrations supprimer (≈15 services câblés, risque R-007) ;
+         - remplacer le stub Prisma \`Page\` par le vrai modèle ;
+         - remplir docs/PROJECT_CONTEXT.md et docs/DOMAIN_MODEL.md sans inventer ;
+         - relire ARCHITECTURE, SECURITY_MODEL, QUALITY_GATES et DEPLOYMENT :
+           ils décrivent le squelette, pas encore votre produit.
 
 `);

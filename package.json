@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "node scripts/install-hooks.mjs",
     "dev": "turbo dev",
     "build": "turbo build",
     "test": "turbo test",
@@ -28,7 +29,8 @@
     "migrate:status": "cd packages/database && pnpm exec prisma migrate status",
     "db:push": "cd packages/database && pnpm exec prisma format && pnpm exec prisma generate && pnpm exec prisma db push",
     "clean": "git clean -xdf node_modules",
-    "hooks:install": "git config core.hooksPath .githooks",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "env:setup": "node scripts/setup-env.mjs",
     "project:init": "node scripts/project-init.mjs"
   },
   "devDependencies": {

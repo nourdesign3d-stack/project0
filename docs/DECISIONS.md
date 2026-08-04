@@ -109,6 +109,39 @@ seul outil de graphe.
 
 ---
 
+## D-012 — Démarrage d'une copie : plomberie automatisée, décisions laissées à l'humain
+
+**Date** : 2026-08-05
+**Contexte** : après neutralisation des identifiants (D-011), un clone exigeait encore
+plusieurs manipulations non documentées, toutes découvertes à la main pendant
+l'initialisation : créer les `.env.local`, commenter les variables vides (une variable
+optionnelle à `""` échoue la validation Zod), renseigner `DATABASE_URL`, activer les
+hooks Git. Un défaut réel a été trouvé en vérifiant : **aucune commande Prisma ne
+fonctionnait** — Prisma 7 ne charge plus les fichiers `.env` lorsqu'un `prisma.config.ts`
+existe, donc `migrate`, `migrate:deploy`, `migrate:status` et `db:push` échouaient tous
+sur « Connection url is empty ».
+**Décision** :
+- `scripts/setup-env.mjs` (`pnpm env:setup`) génère les `.env.local` manquants depuis les
+  `.env.example`, commente les variables sans valeur et renseigne `DATABASE_URL` depuis
+  le `.env` racine. Jamais d'écrasement sans `--force` : ces fichiers contiennent des clés.
+- `scripts/install-hooks.mjs` branché sur `prepare` : `pnpm install` active les hooks
+  Git. Silencieux et sans échec hors dépôt Git.
+- `packages/database/prisma.config.ts` charge `.env.local` puis `.env`, et **échoue avec
+  un message explicite** si `DATABASE_URL` est absente plutôt que de laisser Prisma
+  produire une erreur incompréhensible.
+- `project:init` appelle `env:setup` et affiche en sortie ce qui reste : historique Git,
+  dépôt distant, clés de service, arbitrage des intégrations, premier modèle de données.
+  Ces points restent **manuels par choix** : ce sont des décisions, pas des commandes.
+**Vérifié** : clone propre (sans `.git`, `node_modules`, `.env*`) →
+`project:init --name seed-demo --port 5441` → `pnpm install` (hooks activés) →
+`docker compose up -d` (conteneur et volume propres au dossier) → `pnpm verify`
+(lint, typecheck 24 workspaces, tests, build) → `pnpm migrate --name init` : migration
+créée et appliquée sur la base du clone. Aucune intervention manuelle entre les étapes.
+**Conséquences** : un nouveau projet démarre en quatre commandes. Ce qui reste à faire
+relève du produit, pas de la plomberie.
+
+---
+
 ## D-011 — Dépôt réutilisable par copie : identifiants neutres, journal séparé
 
 **Date** : 2026-08-05

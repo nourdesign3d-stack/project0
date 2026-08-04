@@ -40,7 +40,8 @@ résultat de test, de build ou de scan.
 | Frontières Turborepo | `pnpm boundaries` |
 | Graphe de dépendances | `pnpm graph` |
 | Postgres local | `docker compose up -d` |
-| Hook anti-push sur `main` | `pnpm hooks:install` |
+| Hook anti-push sur `main` | `pnpm hooks:install` (automatique à l'install) |
+| Générer les `.env.local` manquants | `pnpm env:setup` |
 | Réinitialiser une copie du dépôt | `pnpm project:init --name <slug> [--port <n>]` |
 | Migration (dev) | `pnpm migrate` |
 | Migration (déploiement) | `pnpm migrate:deploy` |

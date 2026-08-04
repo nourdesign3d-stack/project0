@@ -71,12 +71,19 @@ ce README portent le nom du projet, et ils sont écrits par un script.
 cp -R <ce-dossier> ../mon-projet          # sans node_modules ni .next
 cd ../mon-projet
 pnpm project:init --name mon-projet --port 5433
+pnpm install                              # active aussi les hooks Git
+docker compose up -d
+pnpm verify
 ```
 
 `project:init` inscrit le nom, remet les **six documents « journal »** de `docs/` à leur
-squelette (`docs/_skeletons/`), écrit le `.env` de Docker Compose et supprime le graphe
-généré. Il ne touche ni à Git, ni au code, ni aux dépendances : les étapes restantes sont
-affichées à la fin.
+squelette (`docs/_skeletons/`), écrit le `.env` de Docker Compose, génère les
+`.env.local` de chaque app depuis les `.env.example` (variables vides commentées,
+`DATABASE_URL` pointée sur le Postgres local) et supprime le graphe généré.
+
+Il ne touche ni à Git, ni au code, ni aux dépendances : les étapes qui relèvent d'une
+décision sont affichées à la fin (historique Git, dépôt distant, clés de service,
+arbitrage des intégrations, premier modèle de données).
 
 Les quatre autres documents (`ARCHITECTURE`, `SECURITY_MODEL`, `QUALITY_GATES`,
 `DEPLOYMENT`) décrivent le squelette et sont **conservés** — à relire, pas à vider.

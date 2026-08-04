@@ -44,6 +44,11 @@ n'attend que le déblocage du plan. Suivi : risque R-011 dans `RISKS.md`.
 Chaque app possède son `.env.example` (versionné, **sans valeur**) et son `.env.local`
 (non versionné).
 
+`pnpm env:setup` crée les `.env.local` manquants à partir des `.env.example` : il commente
+les variables sans valeur (sinon la validation Zod échoue) et renseigne `DATABASE_URL`
+depuis le `.env` racine. Il **n'écrase jamais** un fichier existant sans `--force`.
+`pnpm project:init` l'appelle automatiquement.
+
 ### Réellement requises
 
 | Variable | Format | Utilisée par |
@@ -79,6 +84,11 @@ pnpm migrate:deploy           # application en environnement déployé
 ```
 
 `pnpm db:push` est réservé au prototypage local jetable (bloqué pour l'agent).
+
+`packages/database/prisma.config.ts` charge lui-même `.env.local` puis `.env` : Prisma 7
+ne le fait plus automatiquement quand un fichier de configuration est présent. Sans cela,
+toutes les commandes Prisma échouent sur « Connection url is empty ». La configuration
+lève désormais une erreur explicite si `DATABASE_URL` est absente.
 
 Ordre de déploiement :
 
