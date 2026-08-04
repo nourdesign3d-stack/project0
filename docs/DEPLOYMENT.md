@@ -72,7 +72,7 @@ code y préfixe `http(s)://`. Le template livrait `http://localhost:3000`, corri
 ## Base de données
 
 ```bash
-docker compose up -d          # Postgres local (hôte 5434 → conteneur 5432)
+docker compose up -d          # Postgres local (port hôte défini par POSTGRES_PORT)
 pnpm migrate                  # migration de développement
 pnpm migrate:status           # état des migrations
 pnpm migrate:deploy           # application en environnement déployé

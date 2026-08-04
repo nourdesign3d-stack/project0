@@ -11,7 +11,7 @@ pnpm typecheck
 pnpm test
 ```
 
-Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur sur 24 workspaces**.
+Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur**, sur tous les workspaces.
 
 ## Matrice
 

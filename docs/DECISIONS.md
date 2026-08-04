@@ -109,6 +109,36 @@ seul outil de graphe.
 
 ---
 
+## D-011 — Dépôt réutilisable par copie : identifiants neutres, journal séparé
+
+**Date** : 2026-08-05
+**Contexte** : le dépôt devait pouvoir servir de point de départ à d'autres projets par
+simple copie du dossier. 18 occurrences de `project0` étaient figées dans 12 fichiers
+versionnés, et `docs/` mélangeait deux natures : la description du squelette (vraie pour
+toute copie) et le journal de **ce** projet (décisions, risques, hypothèses).
+**Décision** :
+- identifiants neutralisés — règles Semgrep `local-*` (fichier `local-rules.yaml`),
+  préfixe de hook `[repo]`, `compose.yaml` sans `container_name` ni nom de volume
+  (Docker Compose nomme d'après le dossier), base et port via `POSTGRES_DB` /
+  `POSTGRES_PORT` lus dans un `.env` racine non versionné ;
+- surface portant le nom du projet réduite à **deux** endroits : `package.json` et le
+  titre du README ;
+- `docs/_skeletons/` contient les versions vierges des six documents « journal »
+  (`PROJECT_CONTEXT`, `DOMAIN_MODEL`, `DATA_DICTIONARY`, `ASSUMPTIONS`, `RISKS`,
+  `DECISIONS`) ; les quatre autres décrivent le squelette et restent en place ;
+- `pnpm project:init --name <slug>` stampe le nom, restaure les squelettes, écrit le
+  `.env` et supprime le graphe généré. Il ne touche **ni à Git, ni au code, ni aux
+  dépendances** : ces actions restent des décisions humaines, rappelées en sortie.
+**Vérifié** : copie du dépôt dans un dossier séparé, `project:init --name demo-app
+--port 5439`, puis `pnpm install --frozen-lockfile`, `lint`, `typecheck` (24 workspaces),
+`test`, `build --filter=app...` — tous au vert sous le nouveau nom.
+**Conséquences** : la copie reproduit un état **daté**. Les correctifs de dérive amont
+sont figés par `pnpm-lock.yaml` ; toute montée de version rouvre le sujet. Ce dépôt n'est
+pas une graine maintenue : il n'y a ni versionnage, ni test d'intégration contre les
+nouvelles versions de next-forge.
+
+---
+
 ## D-009 — Durcissement de la chaîne d'approvisionnement
 
 **Date** : 2026-08-04

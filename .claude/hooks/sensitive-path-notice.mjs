@@ -51,7 +51,7 @@ try {
     );
 
     if (notices.length > 0) {
-      process.stderr.write(`[project0] ${notices.join("\n[project0] ")}\n`);
+      process.stderr.write(`[repo] ${notices.join("\n[repo] ")}\n`);
     }
   }
 } catch {

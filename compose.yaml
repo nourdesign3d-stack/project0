@@ -1,5 +1,9 @@
 # Environnement local reproductible.
 #
+# Ce fichier ne contient aucun identifiant de projet : Docker Compose nomme le
+# projet d'après le dossier, donc une copie du dépôt obtient automatiquement ses
+# propres conteneurs et volumes, sans collision avec les autres projets.
+#
 # N'inclut que les services que le code utilise réellement en local :
 #  - Postgres : cible de `DATABASE_URL` (en production : Neon).
 #
@@ -15,20 +19,20 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: project0-postgres
     restart: unless-stopped
     environment:
       # Identifiants de développement local uniquement.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: project0
+      POSTGRES_DB: ${POSTGRES_DB:-app}
     ports:
-      # 5432 est occupé par d'autres projets sur cette machine : on expose 5434.
-      - "5434:5432"
+      # Port hôte surchargeable : 5432 est souvent déjà pris par un autre projet.
+      # Définir POSTGRES_PORT dans un fichier `.env` à la racine (non versionné).
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d project0"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-app}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -36,7 +40,6 @@ services:
 
 volumes:
   postgres-data:
-    name: project0-postgres-data
 # Utilisation
 #   docker compose up -d        démarrer
 #   docker compose ps           état
@@ -46,5 +49,5 @@ volumes:
 # Remise à zéro — DESTRUCTIF, jamais automatique, jamais en partagé :
 #   docker compose down -v      supprime le volume et donc toutes les données locales
 #
-# DATABASE_URL correspondante :
-#   postgresql://postgres:postgres@localhost:5434/project0
+# DATABASE_URL correspondante (adapter le port et le nom de base) :
+#   postgresql://postgres:postgres@localhost:${POSTGRES_PORT}/${POSTGRES_DB}

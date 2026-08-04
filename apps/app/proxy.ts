@@ -16,7 +16,7 @@ const securityHeaders = env.FLAGS_SECRET
 // For apps without Clerk, use createNEMO for composition (see apps/web)
 // Le type de retour de authMiddleware (Clerk) n'est pas assignable au type NextProxy
 // de Next 16 ; conversion imposée par next-forge.
-// nosemgrep: project0-no-ts-suppression
+// nosemgrep: local-no-ts-suppression
 export default authMiddleware(() => securityHeaders()) as unknown as NextProxy;
 
 export const config = {

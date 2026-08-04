@@ -16,7 +16,7 @@
       // `test.skip(condition, reason)` est l'API Playwright de saut conditionnel :
       // le test est déclaré et son absence est rapportée. Ce n'est pas un test
       // désactivé pour faire passer la CI (interdit par .claude/rules/quality.md,
-      // et détecté par la règle Semgrep project0-no-skipped-tests sur les tests unitaires).
+      // et détecté par la règle Semgrep local-no-skipped-tests sur les tests unitaires).
       "includes": ["e2e/**"],
       "linter": {
         "rules": {

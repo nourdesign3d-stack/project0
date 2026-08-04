@@ -11,7 +11,7 @@ Monorepo Turborepo basé sur [next-forge](https://github.com/vercel/next-forge) 
 ```bash
 pnpm install
 pnpm hooks:install             # garde-fou : pas de push direct sur main
-docker compose up -d           # Postgres local (hôte 5434)
+docker compose up -d           # Postgres local (port réglé dans .env)
 cp apps/app/.env.example apps/app/.env.local   # puis renseigner les variables
 pnpm dev
 ```
@@ -60,6 +60,31 @@ Analytics, Arcjet + Nosecone (sécurité), Upstash (limitation de débit), Svix 
 sortants), Sentry + BetterStack (observabilité), Vercel Blob (stockage).
 
 Toutes sont **câblées mais inertes** tant que leurs clés ne sont pas fournies.
+
+## Repartir de ce dépôt pour un autre projet
+
+Le dépôt ne contient plus d'identifiant en dur : les règles Semgrep, le hook, le nom des
+conteneurs Docker et le graphe sont neutres. Seuls le nom du paquet racine et le titre de
+ce README portent le nom du projet, et ils sont écrits par un script.
+
+```bash
+cp -R <ce-dossier> ../mon-projet          # sans node_modules ni .next
+cd ../mon-projet
+pnpm project:init --name mon-projet --port 5433
+```
+
+`project:init` inscrit le nom, remet les **six documents « journal »** de `docs/` à leur
+squelette (`docs/_skeletons/`), écrit le `.env` de Docker Compose et supprime le graphe
+généré. Il ne touche ni à Git, ni au code, ni aux dépendances : les étapes restantes sont
+affichées à la fin.
+
+Les quatre autres documents (`ARCHITECTURE`, `SECURITY_MODEL`, `QUALITY_GATES`,
+`DEPLOYMENT`) décrivent le squelette et sont **conservés** — à relire, pas à vider.
+Détail de la répartition : [`docs/_skeletons/README.md`](./docs/_skeletons/README.md).
+
+⚠️ Ce que cette copie n'apporte pas : les correctifs de dérive amont sont figés par
+`pnpm-lock.yaml`. Une montée de version (`pnpm bump-deps`, `next-forge update`) rouvrira
+ce chantier. Lancer `pnpm verify` après toute mise à jour.
 
 ## Contribuer
 

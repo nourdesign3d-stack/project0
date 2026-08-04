@@ -7,7 +7,7 @@
 # Une règle trop bruyante est un bug : on la corrige ou on la supprime.
 
 rules:
-  - id: project0-no-ts-suppression
+  - id: local-no-ts-suppression
     languages: [typescript]
     severity: ERROR
     message: >-
@@ -21,7 +21,7 @@ rules:
         - "**/packages/design-system/components/ui/**"
         - "**/packages/database/generated/**"
 
-  - id: project0-no-dangerous-html
+  - id: local-no-dangerous-html
     languages: [typescript]
     severity: WARNING
     message: >-
@@ -34,7 +34,7 @@ rules:
         - "**/node_modules/**"
         - "**/packages/design-system/components/ui/**"
 
-  - id: project0-no-skipped-tests
+  - id: local-no-skipped-tests
     languages: [typescript]
     severity: WARNING
     message: >-
@@ -53,7 +53,7 @@ rules:
       exclude:
         - "**/e2e/**"
 
-  - id: project0-no-env-in-client-component
+  - id: local-no-env-in-client-component
     languages: [typescript]
     severity: ERROR
     message: >-

@@ -9,7 +9,7 @@ globs: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "e2e/**", "**/vitest
 
 - **Lint / format** : Biome via Ultracite (`biome.jsonc`) → `pnpm lint`, `pnpm format`.
 - **Typecheck** : `tsc --noEmit` par workspace, orchestré par Turborepo → `pnpm typecheck`.
-  Référence actuelle : **0 erreur sur 24 workspaces**. Toute régression est un blocage.
+  Référence à ne jamais dégrader : **0 erreur**, sur tous les workspaces. Toute régression est un blocage.
 - **Tests unitaires / intégration** : Vitest (`apps/app`, `apps/api`) → `pnpm test`.
 - **Tests E2E** : Playwright à la racine (`playwright.config.ts`, `e2e/tests`) → `pnpm e2e`.
 - **Sécurité statique** : Semgrep → `pnpm semgrep`.
