@@ -23,7 +23,8 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: project0
     ports:
-      - "5432:5432"
+      # 5432 est occupé par d'autres projets sur cette machine : on expose 5434.
+      - "5434:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -46,4 +47,4 @@ volumes:
 #   docker compose down -v      supprime le volume et donc toutes les données locales
 #
 # DATABASE_URL correspondante :
-#   postgresql://postgres:postgres@localhost:5432/project0
+#   postgresql://postgres:postgres@localhost:5434/project0

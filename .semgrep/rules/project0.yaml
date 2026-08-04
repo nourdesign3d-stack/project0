@@ -18,8 +18,8 @@ rules:
     paths:
       exclude:
         - "**/node_modules/**"
-        - "packages/design-system/components/ui/**"
-        - "packages/database/generated/**"
+        - "**/packages/design-system/components/ui/**"
+        - "**/packages/database/generated/**"
 
   - id: project0-no-dangerous-html
     languages: [typescript]
@@ -32,7 +32,7 @@ rules:
     paths:
       exclude:
         - "**/node_modules/**"
-        - "packages/design-system/components/ui/**"
+        - "**/packages/design-system/components/ui/**"
 
   - id: project0-no-skipped-tests
     languages: [typescript]
@@ -51,7 +51,7 @@ rules:
         - "**/*.test.ts"
         - "**/*.test.tsx"
       exclude:
-        - "e2e/**"
+        - "**/e2e/**"
 
   - id: project0-no-env-in-client-component
     languages: [typescript]

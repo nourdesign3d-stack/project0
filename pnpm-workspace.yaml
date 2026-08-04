@@ -1,4 +1,4 @@
-packages:
+packages: # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
   - 'apps/*'
   - 'packages/*'
 
