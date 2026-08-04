@@ -1,0 +1,37 @@
+#!/bin/sh
+# Garde-fou local : interdit de pousser directement sur `main`.
+#
+# Le dépôt est privé sur un plan GitHub gratuit : ni les branches protégées ni les
+# rulesets ne sont disponibles côté serveur (HTTP 403 « Upgrade to GitHub Pro »).
+# Ce hook n'est donc PAS un contrôle de sécurité — il est contournable et local —
+# mais il évite l'erreur la plus courante. Voir docs/DEPLOYMENT.md.
+#
+# Activation : pnpm hooks:install   (git config core.hooksPath .githooks)
+# Contournement volontaire et exceptionnel :
+#   ALLOW_DIRECT_PUSH_MAIN=1 git push origin main
+
+protected_branch="refs/heads/main"
+
+if [ "${ALLOW_DIRECT_PUSH_MAIN}" = "1" ]; then
+  echo "pre-push : contournement explicite (ALLOW_DIRECT_PUSH_MAIN=1)." >&2
+  exit 0
+fi
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "${remote_ref}" = "${protected_branch}" ]; then
+    echo "" >&2
+    echo "  ✗ Push direct sur main refusé." >&2
+    echo "" >&2
+    echo "    Passer par une branche et une pull request :" >&2
+    echo "      git switch -c <type>/<sujet>" >&2
+    echo "      git push -u origin HEAD" >&2
+    echo "      gh pr create" >&2
+    echo "" >&2
+    echo "    La CI doit être verte avant fusion (docs/QUALITY_GATES.md)." >&2
+    echo "    Exception assumée : ALLOW_DIRECT_PUSH_MAIN=1 git push origin main" >&2
+    echo "" >&2
+    exit 1
+  fi
+done
+
+exit 0

@@ -18,6 +18,27 @@ Pour activer les jobs conditionnels : *Settings → Secrets and variables → Ac
 Variables* → `ENABLE_FULL_BUILD` / `ENABLE_E2E` = `true`, après avoir renseigné les secrets
 correspondants.
 
+## Protection de `main`
+
+⚠️ **Aucune protection côté serveur.** Le dépôt est privé sur un plan GitHub gratuit :
+l'API refuse aussi bien les branches protégées que les rulesets
+(`403 — Upgrade to GitHub Pro or make this repository public`).
+
+Ce qui est en place à la place :
+
+- un hook `pre-push` versionné dans `.githooks/` qui refuse un push direct sur `main` ;
+- activation obligatoire après clonage : `pnpm hooks:install` ;
+- exception assumée et tracée : `ALLOW_DIRECT_PUSH_MAIN=1 git push origin main`.
+
+**Ce hook n'est pas un contrôle de sécurité** : il est local, contournable, et ne
+s'applique qu'aux postes qui l'ont activé. Rien n'empêche techniquement une fusion sans
+CI verte. La discipline repose donc sur la revue et sur `QUALITY_GATES.md`.
+
+Pour obtenir une vraie protection : passer le dépôt en public, ou souscrire GitHub Pro.
+La règle à appliquer alors — PR obligatoire, checks requis `Lint · Typecheck · Test · Build`
+et `Semgrep`, historique linéaire, force-push et suppression interdits — est prête et
+n'attend que le déblocage du plan. Suivi : risque R-011 dans `RISKS.md`.
+
 ## Variables d'environnement
 
 Chaque app possède son `.env.example` (versionné, **sans valeur**) et son `.env.local`

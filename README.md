@@ -10,7 +10,8 @@ Monorepo Turborepo basé sur [next-forge](https://github.com/vercel/next-forge) 
 
 ```bash
 pnpm install
-docker compose up -d          # Postgres local
+pnpm hooks:install             # garde-fou : pas de push direct sur main
+docker compose up -d           # Postgres local (hôte 5434)
 cp apps/app/.env.example apps/app/.env.local   # puis renseigner les variables
 pnpm dev
 ```

@@ -27,7 +27,8 @@
     "migrate:deploy": "cd packages/database && pnpm exec prisma generate && pnpm exec prisma migrate deploy",
     "migrate:status": "cd packages/database && pnpm exec prisma migrate status",
     "db:push": "cd packages/database && pnpm exec prisma format && pnpm exec prisma generate && pnpm exec prisma db push",
-    "clean": "git clean -xdf node_modules"
+    "clean": "git clean -xdf node_modules",
+    "hooks:install": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",

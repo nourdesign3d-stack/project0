@@ -16,7 +16,7 @@ Statut : `ouvert` / `atténué` / `accepté` / `fermé`.
 | R-008 | Parcours **authentifié** non couvert : aucun compte de test fourni (`E2E_USER_EMAIL`/`E2E_USER_PASSWORD`) | moyenne | haute | 4 tests E2E exécutés le 2026-08-04 contre le serveur local (smoke + refus d'accès) ; le parcours authentifié est explicitement `skip`, jamais silencieux | à désigner | atténué |
 | R-009 | Surface de dépendances très large (≈20 packages, ~15 services tiers) pour un produit sans périmètre défini | moyenne | haute | hypothèse H-006 : arbitrage de suppression à faire | propriétaire produit | ouvert |
 | R-010 | Aucune revue de ce qui part vers Sentry / BetterStack (fuite potentielle de donnée personnelle) | élevée | moyenne | `.claude/rules/security.md` impose le filtrage ; non implémenté | à désigner | ouvert |
-| R-011 | Branche principale sans protection (dépôt local, aucun remote configuré) | moyenne | haute | procédure décrite dans `DEPLOYMENT.md` ; à appliquer à la création du remote | à désigner | ouvert |
+| R-011 | `main` sans protection **côté serveur** : dépôt privé sur plan GitHub gratuit, branches protégées et rulesets refusés (403). Une fusion sans CI verte reste techniquement possible | moyenne | moyenne | hook `pre-push` local versionné (`.githooks/`, `pnpm hooks:install`) refusant les pushs directs — contournable, ne remplace pas une règle serveur ; règle serveur prête à appliquer (DEPLOYMENT.md) | propriétaire du dépôt | **accepté** (décision du 2026-08-05 : rester privé sans plan payant) |
 
 ## Revue
 
