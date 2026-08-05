@@ -31,7 +31,8 @@
     "clean": "git clean -xdf node_modules",
     "hooks:install": "node scripts/install-hooks.mjs",
     "env:setup": "node scripts/setup-env.mjs",
-    "project:init": "node scripts/project-init.mjs"
+    "project:init": "node scripts/project-init.mjs",
+    "vibe0": "node scripts/vibe0.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",

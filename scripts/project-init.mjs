@@ -42,12 +42,14 @@ const JOURNAL = [
 ];
 
 const parseArgs = (argv) => {
-  const args = { dryRun: false };
+  const args = { dryRun: false, keepDocs: false };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--dry-run") {
       args.dryRun = true;
+    } else if (arg === "--keep-docs") {
+      args.keepDocs = true;
     } else if (arg === "--name" || arg === "--port") {
       args[arg.slice(2)] = argv[i + 1];
       i += 1;
@@ -103,8 +105,8 @@ const readme = readFileSync(readmePath, "utf8").split("\n");
 readme[0] = `# ${name}`;
 write("README.md", readme.join("\n"));
 
-// 3. Documents journal remplacés par leurs squelettes.
-for (const file of JOURNAL) {
+// 3. Documents journal remplacés par leurs squelettes (sauf --keep-docs).
+for (const file of args.keepDocs ? [] : JOURNAL) {
   const skeleton = join(root, "docs/_skeletons", file);
 
   if (!existsSync(skeleton)) {
