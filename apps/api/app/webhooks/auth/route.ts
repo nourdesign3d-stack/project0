@@ -11,6 +11,9 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { env } from "@/env";
+import { claimEvent, releaseEvent } from "@/lib/idempotency";
+
+const PROVIDER = "clerk";
 
 const handleUserCreated = (data: UserJSON) => {
   analytics?.identify({
@@ -145,8 +148,10 @@ const handleOrganizationMembershipDeleted = (
 };
 
 export const POST = async (request: Request): Promise<Response> => {
+  // 503 et non 2xx : un 2xx dit au fournisseur « reçu et traité ». Sans clé,
+  // rien n'est traité — l'événement serait perdu sans trace chez Clerk.
   if (!env.CLERK_WEBHOOK_SECRET) {
-    return NextResponse.json({ message: "Not configured", ok: false });
+    return NextResponse.json({ ok: false }, { status: 503 });
   }
 
   // Get the headers
@@ -195,43 +200,74 @@ export const POST = async (request: Request): Promise<Response> => {
   // un service tiers (BetterStack). Voir .claude/rules/security.md.
   log.info("Webhook", { id, eventType });
 
-  let response: Response = new Response("", { status: 201 });
+  // Réserver avant de traiter (R-012). La clé est `svix-id`, identifiant de
+  // **livraison** : Svix conserve le même d'un réessai à l'autre, alors que
+  // l'identifiant de la ressource (`event.data.id`) est partagé par tous les
+  // événements qui la concernent — l'utiliser confondrait une création et une
+  // mise à jour du même utilisateur.
+  let claimed: boolean;
 
-  switch (eventType) {
-    case "user.created": {
-      response = handleUserCreated(event.data);
-      break;
-    }
-    case "user.updated": {
-      response = handleUserUpdated(event.data);
-      break;
-    }
-    case "user.deleted": {
-      response = handleUserDeleted(event.data);
-      break;
-    }
-    case "organization.created": {
-      response = handleOrganizationCreated(event.data);
-      break;
-    }
-    case "organization.updated": {
-      response = handleOrganizationUpdated(event.data);
-      break;
-    }
-    case "organizationMembership.created": {
-      response = handleOrganizationMembershipCreated(event.data);
-      break;
-    }
-    case "organizationMembership.deleted": {
-      response = handleOrganizationMembershipDeleted(event.data);
-      break;
-    }
-    default: {
-      break;
-    }
+  try {
+    claimed = await claimEvent(PROVIDER, svixId);
+  } catch (error) {
+    log.error("Webhook : réservation impossible", { id, eventType, error });
+
+    return NextResponse.json({ ok: false }, { status: 503 });
   }
 
-  await analytics?.shutdown();
+  if (!claimed) {
+    log.info("Webhook : événement déjà traité", { id, eventType });
+
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
+  let response: Response = new Response("", { status: 201 });
+
+  try {
+    switch (eventType) {
+      case "user.created": {
+        response = handleUserCreated(event.data);
+        break;
+      }
+      case "user.updated": {
+        response = handleUserUpdated(event.data);
+        break;
+      }
+      case "user.deleted": {
+        response = handleUserDeleted(event.data);
+        break;
+      }
+      case "organization.created": {
+        response = handleOrganizationCreated(event.data);
+        break;
+      }
+      case "organization.updated": {
+        response = handleOrganizationUpdated(event.data);
+        break;
+      }
+      case "organizationMembership.created": {
+        response = handleOrganizationMembershipCreated(event.data);
+        break;
+      }
+      case "organizationMembership.deleted": {
+        response = handleOrganizationMembershipDeleted(event.data);
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+
+    await analytics?.shutdown();
+  } catch (error) {
+    // Libérer, sinon le réessai de Clerk serait pris pour un doublon et
+    // l'événement serait perdu en silence.
+    await releaseEvent(PROVIDER, svixId);
+
+    log.error("Webhook : traitement en échec", { id, eventType, error });
+
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
 
   return response;
 };

@@ -25,6 +25,21 @@ let configured = true;
 const capture = vi.fn();
 const logError = vi.fn();
 const getUserList = vi.fn();
+const createEvent = vi.fn();
+const deleteEvent = vi.fn();
+
+const duplicate = () => Object.assign(new Error("unique"), { code: "P2002" });
+
+// La mémoire d'idempotence est simulée, mais la **logique** qui l'utilise ne
+// l'est pas : `lib/idempotency.ts` est chargé pour de vrai.
+vi.mock("@repo/database", () => ({
+  database: {
+    webhookEvent: {
+      create: (...args: unknown[]) => createEvent(...args),
+      delete: (...args: unknown[]) => deleteEvent(...args),
+    },
+  },
+}));
 
 // `@repo/payments` n'est **pas** simulé : la route utilise le vrai client Stripe,
 // donc la vraie vérification de signature. Seule la clé est factice — le SDK ne
@@ -50,7 +65,11 @@ vi.mock("@repo/auth/server", () => ({
 }));
 
 vi.mock("@repo/observability/log", () => ({
-  log: { warn: vi.fn(), error: (...args: unknown[]) => logError(...args) },
+  log: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: (...args: unknown[]) => logError(...args),
+  },
 }));
 
 vi.mock("@repo/observability/error", () => ({
@@ -102,6 +121,10 @@ describe("webhook Stripe", () => {
     logError.mockReset();
     getUserList.mockReset();
     getUserList.mockResolvedValue({ data: [], totalCount: 0 });
+    createEvent.mockReset();
+    createEvent.mockResolvedValue(undefined);
+    deleteEvent.mockReset();
+    deleteEvent.mockResolvedValue(undefined);
   });
 
   test("refuse une requête sans en-tête de signature", async () => {
@@ -187,6 +210,55 @@ describe("webhook Stripe", () => {
     const response = await post(body, { "stripe-signature": "t=1,v1=x" });
 
     expect(response.status).toBeGreaterThanOrEqual(500);
+  });
+
+  test("réserve l'événement avant de le traiter", async () => {
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    expect(createEvent).toHaveBeenCalledWith({
+      data: { provider: "stripe", eventId: "evt_1" },
+    });
+  });
+
+  test("ne retraite pas un événement déjà reçu", async () => {
+    // Stripe rejoue dès qu'il doute de la livraison. Un paiement retraité a des
+    // conséquences réelles.
+    createEvent.mockRejectedValue(duplicate());
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+    const response = await post(body, { "stripe-signature": sign(body) });
+
+    expect(response.status).toBe(200);
+    expect(getUserList).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  test("libère la réservation quand le traitement échoue", async () => {
+    // Sans libération, le réessai serait pris pour un doublon et l'événement
+    // perdu en silence — l'inverse du but recherché.
+    getUserList.mockRejectedValue(new Error("Clerk injoignable"));
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+    const response = await post(body, { "stripe-signature": sign(body) });
+
+    expect(response.status).toBe(500);
+    expect(deleteEvent).toHaveBeenCalledWith({
+      where: { provider_eventId: { provider: "stripe", eventId: "evt_1" } },
+    });
+  });
+
+  test("refuse de traiter si la mémoire d'idempotence est indisponible", async () => {
+    // Une base injoignable n'est pas un doublon. Traiter quand même reviendrait
+    // à renoncer à l'idempotence en silence.
+    createEvent.mockRejectedValue(new Error("base injoignable"));
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+    const response = await post(body, { "stripe-signature": sign(body) });
+
+    expect(response.status).toBe(503);
+    expect(capture).not.toHaveBeenCalled();
   });
 
   test("parcourt toutes les pages d'utilisateurs pour retrouver le client", async () => {
