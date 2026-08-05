@@ -97,7 +97,11 @@ test.describe("parcours authentifié", () => {
         );
       }
 
-      await codeField.fill(otp);
+      // Saisie caractère par caractère : le champ de Clerk est segmenté et
+      // réagit à chaque frappe. `fill()` le remplissait parfois sans que le
+      // fournisseur enregistre la valeur — le formulaire repartait alors avec
+      // « Enter code. », de façon intermittente (constaté en CI le 2026-08-05).
+      await codeField.pressSequentially(otp, { delay: 50 });
       // Clerk valide souvent dès la saisie complète ; le bouton peut avoir
       // disparu entre-temps, ce qui n'est pas un échec.
       await page
