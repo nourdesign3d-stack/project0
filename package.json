@@ -23,7 +23,7 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "semgrep": "semgrep scan --config p/typescript --config p/react --config p/secrets --config p/owasp-top-ten --config .semgrep/rules --error",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build --filter=app... --filter=api...",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build --filter=app... --filter=api... --filter=email...",
     "graph": "mkdir -p docs/graph && depcruise apps packages --output-type mermaid --output-to docs/graph/dependencies.mmd && depcruise apps packages --output-type err-long",
     "bump-deps": "pnpm dlx npm-check-updates --deep -u && pnpm install",
     "bump-ui": "pnpm dlx shadcn@latest add --all --overwrite -c packages/design-system",

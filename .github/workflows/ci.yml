@@ -67,8 +67,8 @@ jobs:
 
       # Build restreint aux apps qui ne dépendent pas d'un service tiers.
       # Le build complet (apps/web → @repo/cms → BaseHub) est dans le job `build-full`.
-      - name: Build (app, api)
-        run: pnpm build --filter=app... --filter=api...
+      - name: Build (app, api, email)
+        run: pnpm build --filter=app... --filter=api... --filter=email...
 
   semgrep:
     name: Semgrep

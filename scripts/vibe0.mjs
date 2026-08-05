@@ -275,14 +275,44 @@ const resetDocs = await confirm(
 
 say("");
 say("  Application…");
-run(process.execPath, [
-  "scripts/project-init.mjs",
-  "--name",
-  name,
-  "--port",
-  String(port),
-  ...(resetDocs ? [] : ["--keep-docs"]),
-]);
+
+try {
+  run(process.execPath, [
+    "scripts/project-init.mjs",
+    "--name",
+    name,
+    "--port",
+    String(port),
+    ...(resetDocs ? [] : ["--keep-docs"]),
+  ]);
+} catch {
+  // Cas typique : relance dans un projet déjà amorcé sous le même nom.
+  // project-init a déjà affiché un message clair — ne pas l'enterrer sous une
+  // trace Node, et proposer la suite au lieu de renvoyer l'utilisateur au shell.
+  say("");
+
+  if (
+    await confirm(
+      "Régénérer quand même les fichiers d'environnement (--fresh) ? Les clés saisies précédemment seront perdues",
+      false
+    )
+  ) {
+    run(process.execPath, [
+      "scripts/project-init.mjs",
+      "--name",
+      name,
+      "--port",
+      String(port),
+      "--fresh",
+      ...(resetDocs ? [] : ["--keep-docs"]),
+    ]);
+  } else {
+    say("  Amorçage interrompu : rien n'a été modifié de plus.");
+    finished = true;
+    rl.close();
+    process.exit(1);
+  }
+}
 
 // 4. Clés de service — saisie masquée, écriture directe.
 say("  Clés de service");
@@ -412,7 +442,9 @@ if (
           "origin",
           `https://github.com/${owner()}/${repository}.git`,
         ]);
-        run("git", ["push", "-u", "origin", "main"]);
+        // Ne pas supposer `main` : sans `init.defaultBranch`, git crée `master`.
+        const branch = capture("git", ["branch", "--show-current"]) || "main";
+        run("git", ["push", "-u", "origin", branch]);
       } catch {
         say("    → rattachement ou push refusé (dépôt non vide ?).");
         say("       Vérifier :  git remote -v  puis  git push -u origin main");

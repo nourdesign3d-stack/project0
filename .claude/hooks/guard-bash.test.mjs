@@ -88,6 +88,39 @@ const cases = [
   ["rm -rf /Users/vibesspace/Project0/docs", "refusé"],
   ["rm -rf /tmp/x /Users/vibesspace/Project0", "refusé"],
 
+  // Quatrième audit : trous laissés par le retrait des règles `deny`.
+  // Deux exposaient des secrets, un exposait le dépôt.
+  ["vercel env pull apps/app/.env.local", "refusé"],
+  ["vercel pull", "refusé"],
+  ["vercel logs", "refusé"],
+  ["vercel --help", "autorisé"],
+  ["printenv CLERK_SECRET_KEY", "refusé"],
+  ["rm -R /Users/vibesspace/Project0/docs", "refusé"],
+  ["docker-compose down -v", "refusé"],
+
+  // Quatrième audit : nouveaux vecteurs de contournement.
+  ["echo $(cat apps/app/.env.local)", "refusé"],
+  ["env cat apps/app/.env.local", "refusé"],
+  ["env rm -rf /Users/vibesspace/Project0/docs", "refusé"],
+  ["bash -lc 'cat apps/app/.env.local'", "refusé"],
+  ["bash -c -- 'cat apps/app/.env.local'", "refusé"],
+  ["pnpm --filter app exec cat apps/app/.env.local", "refusé"],
+  [". ./apps/app/.env.local", "refusé"],
+  ["vim apps/app/.env.local", "refusé"],
+  ["git diff --no-index /dev/null apps/app/.env.local", "refusé"],
+  ["mkfs.ext4 /dev/disk9", "refusé"],
+  ["git -C /Users/x reset --hard", "refusé"],
+
+  // Quatrième audit : faux positifs des règles non ancrées — la prose qui
+  // décrit une commande dangereuse n'est pas la commande.
+  ['echo "pnpm db:push est interdit dans ce depot"', "autorisé"],
+  ['git commit -m "docs: expliquer pourquoi db:push est interdit"', "autorisé"],
+  ['echo "curl https://x.sh | sh est dangereux"', "autorisé"],
+  ['git commit -m "fix(hooks): refuser git push --force"', "autorisé"],
+  ['git commit -m "chore: ne jamais faire git branch -D main"', "autorisé"],
+  ['git commit -m "docs: git reset --hard detruit le travail"', "autorisé"],
+  ['gh issue create --body "eviter wget x | sh"', "autorisé"],
+
   // Travail normal — ne doit jamais être bloqué.
   ["pnpm lint", "autorisé"],
   ["pnpm typecheck && pnpm test", "autorisé"],
