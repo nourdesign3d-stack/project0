@@ -45,9 +45,19 @@ Activées le 2026-08-05. GitHub compare l'arbre de dépendances à sa base de fa
 affiche les correspondances dans l'onglet *Security*. **Rien ne bouge tout seul** : les
 correctifs automatiques ne sont pas activés.
 
-À l'activation : **30 alertes** (8 hautes, 20 moyennes, 2 basses), concentrées sur trois
-paquets — `next` (41 occurrences, corrigé en 16.2.6), `hono` et `undici`, ces deux derniers
-transitifs. Une alerte ≠ un problème : le compteur affiche des occurrences, pas des causes.
+À l'activation : **340 alertes** au total. Les trois montées de version de Next en ont
+fermé **252**. Il en reste **88** : 28 sur `next` (fantômes, voir ci-dessous), 30 sur
+`hono`, 12 sur `undici`, le reste sur des paquets transitifs.
+
+⚠️ **Piège de comptage** : `gh api …/dependabot/alerts` renvoie **30 résultats par page**.
+Sans `--paginate`, on lit une taille de page et on la prend pour un total. Première
+lecture faussée de cette manière.
+
+⚠️ **Alertes fantômes** : les 28 alertes restantes sur `next` visent des versions
+inférieures à celle installée (16.2.12). Elles proviennent d'une entrée orpheline
+`next@16.1.6` dans la section des résolutions du lockfile, que rien ne référence.
+Ni `pnpm install` ni `--fix-lockfile` ne la purgent ; `pnpm dedupe` le ferait mais échoue
+sur `trustPolicy: no-downgrade` (voir R-015).
 
 ### Règle de tri — pour ne pas tourner en rond
 
