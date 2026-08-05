@@ -47,7 +47,7 @@ seule protection est la vérification de signature.
 | Contrôle | Implémentation | Statut |
 | --- | --- | --- |
 | Authentification | Clerk (`packages/auth`) | actif, non configuré (clés absentes) |
-| Protection de routes | aucune au niveau proxy — `apps/app/proxy.ts` n'appelle pas `auth.protect()` ; seule la redirection du layout authentifié protège les pages | **à traiter** |
+| Protection de routes | aucune au niveau proxy, **par choix** : Clerk 7 déprécie la protection par correspondance de chemins, qui peut laisser des ressources joignables (D-019). L'autorisation vit dans les layouts, pages, route handlers et server actions ; `apps/app/__tests__/route-protection.test.ts` échoue pour toute route sans contrôle ni déclaration publique justifiée | **couvert contre l'oubli, pas contre l'erreur** |
 | En-têtes de sécurité | Nosecone (`packages/security`) | actif |
 | Bot / WAF | **aucun** — Arcjet retiré le 2026-08-05 (D-014) | **absent, assumé** |
 | Limitation de débit | Upstash (`packages/rate-limit`) | câblé, clé absente |

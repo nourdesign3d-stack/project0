@@ -111,6 +111,39 @@ seul outil de graphe.
 
 ---
 
+## D-019 — R-013 : un test, pas un middleware
+
+**Date** : 2026-08-05
+**Contexte** : R-013 était avéré — une route posée hors du groupe `(authenticated)`
+répondait `200` à un appel anonyme. Le réflexe est d'ajouter `auth.protect()` dans
+`apps/app/proxy.ts`, avec une liste de routes publiques. Ce correctif a été écrit,
+puis **retiré**.
+
+Motif du retrait : à la première exécution, Clerk 7 a émis un avertissement de
+dépréciation sur `createRouteMatcher`, en donnant précisément la raison qui fait R-013 —
+la protection par correspondance de chemins « peut diverger du routage réel de Next.js et
+laisser des ressources protégées joignables ». Le correctif aurait donc apporté une
+confiance fausse, et disparaîtra à la prochaine version majeure du fournisseur. Sa
+recommandation rejoint `.claude/rules/security.md` : contrôler au plus près de la donnée.
+
+**Décision** : `proxy.ts` reste du **routage**, ce que ARCHITECTURE.md affirmait déjà.
+L'autorisation reste dans les layouts, pages, route handlers et server actions. Le risque
+réel — l'oubli — est traité par un test qui le rend **détectable** :
+`apps/app/__tests__/route-protection.test.ts` parcourt `app/`, et échoue pour toute route
+qui n'a ni contrôle d'autorisation (dans le fichier ou un layout parent) ni entrée
+justifiée dans `PUBLIC_ROUTES`.
+
+**Conséquences** : le test a été **vu échouer** sur le scénario exact de R-013 (`probe/route.ts`
+sans contrôle), avec un message nommant la route et l'action à mener. Deux tests
+l'accompagnent : une entrée périmée dans `PUBLIC_ROUTES` échoue aussi (une exception doit
+rester examinée), et un jeu de routes vide échoue (sans quoi une erreur de chemin
+rendrait le tout vert en n'analysant rien).
+
+**Limite assumée** : ce test constate la *présence* d'un contrôle, pas sa *justesse*. Un
+`auth()` dont on ignore le résultat le satisfait. Il ferme l'oubli, pas l'erreur.
+
+---
+
 ## D-018 — Vérifier les services tiers sur un projet jetable, jamais sur la graine
 
 **Date** : 2026-08-05
