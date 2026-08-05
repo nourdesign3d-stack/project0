@@ -39,6 +39,7 @@ résultat de test, de build ou de scan.
 | Chaîne complète locale | `pnpm verify` |
 | Tests du garde-fou Bash | `pnpm test:hooks` |
 | Tests des scripts d'amorçage | `pnpm test:scripts` |
+| Tests du lanceur | `pnpm test:launcher` |
 | Frontières Turborepo | `pnpm boundaries` |
 | Graphe de dépendances | `pnpm graph` |
 | Postgres local | `docker compose up -d` |

@@ -2,6 +2,14 @@ packages: # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pn
   - 'apps/*'
   - 'packages/*'
 
+# Versions imposées à tout l'arbre, dépendances transitives comprises.
+# pnpm 10 lit ce réglage ici, pas dans le champ `overrides` de package.json.
+overrides:
+  # `@react-email/ui` dépend de next 16.2.6, sous le seuil de correction 16.2.11 :
+  # il réintroduisait 9 alertes de vulnérabilité, dont 4 de sévérité haute, alors
+  # que toutes les applications déclarent 16.2.12. Relevé par audit externe.
+  next: 16.2.12
+
 # --- Durcissement de la chaîne d'approvisionnement (pnpm >= 10.26) ---
 # Motivé par les règles Semgrep p/owasp-top-ten sur les gestionnaires de paquets.
 

@@ -6,7 +6,7 @@
 
 | Job | Contenu | Condition |
 | --- | --- | --- |
-| `quality` | install figé → `prisma generate` → `lint` → `typecheck` → `test` → build `app` + `api` | toujours |
+| `quality` | install figé → `prisma generate` → `lint` → `typecheck` → `test` → `test:hooks` → `test:scripts` → `test:launcher` → `boundaries` → build `app` + `api` | toujours |
 | `semgrep` | analyse statique de sécurité (conteneur officiel Semgrep) | toujours |
 | `build-full` | `pnpm build` complet (inclut `@repo/cms` et `apps/web`) | `vars.ENABLE_FULL_BUILD == 'true'` **et** secret `BASEHUB_TOKEN` configuré |
 | `e2e` | Playwright sur les parcours critiques | `vars.ENABLE_E2E == 'true'` |
@@ -45,8 +45,8 @@ Activées le 2026-08-05. GitHub compare l'arbre de dépendances à sa base de fa
 affiche les correspondances dans l'onglet *Security*. **Rien ne bouge tout seul** : les
 correctifs automatiques ne sont pas activés.
 
-À l'activation : **340 alertes** au total. Les trois montées de version de Next en ont
-fermé **252**. Il en reste **88** : 28 sur `next` (fantômes, voir ci-dessous), 30 sur
+À l'activation : **340 alertes** au total. Les montées de version de Next en ont
+fermé **271**. Il en restait **69** : 28 sur `next` (fantômes, voir ci-dessous), 30 sur
 `hono`, 12 sur `undici`, le reste sur des paquets transitifs.
 
 ⚠️ **Piège de comptage** : `gh api …/dependabot/alerts` renvoie **30 résultats par page**.
@@ -119,7 +119,7 @@ Sans elles, le démarrage et le build échouent — comportement voulu.
 
 `CLERK_SECRET_KEY` (`sk_…`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_…`),
 `CLERK_WEBHOOK_SECRET` (`whsec_…`), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`BASEHUB_TOKEN`, `RESEND_TOKEN`, `RESEND_FROM`, `ARCJET_KEY`, `SVIX_TOKEN`,
+`BASEHUB_TOKEN`, `RESEND_TOKEN`, `RESEND_FROM`, `SVIX_TOKEN`,
 `LIVEBLOCKS_SECRET`, `KNOCK_*`, `UPSTASH_REDIS_REST_*`, `FLAGS_SECRET`,
 `BETTERSTACK_*`, `SENTRY_ORG`, `SENTRY_PROJECT`, `NEXT_PUBLIC_SENTRY_DSN`,
 `NEXT_PUBLIC_POSTHOG_*`, `NEXT_PUBLIC_GA_MEASUREMENT_ID`.

@@ -20,7 +20,7 @@ Le dépôt contient le squelette technique fonctionnel de next-forge :
 - application authentifiée (`apps/app`), site public (`apps/web`), API/webhooks (`apps/api`) ;
 - intégrations câblées mais inertes : Clerk (auth), Stripe (paiement), Neon/Prisma (données),
   BaseHub (CMS), Resend (e-mail), Knock (notifications), Liveblocks (collaboration),
-  PostHog/GA (analytics), Arcjet (sécurité), Upstash (rate limit), Sentry + BetterStack
+  PostHog/GA (analytics), Nosecone (en-têtes), Upstash (rate limit), Sentry + BetterStack
   (observabilité) ;
 - un seul modèle Prisma : `Page`, stub de démonstration.
 
@@ -49,7 +49,7 @@ Détail dans [ARCHITECTURE.md](./ARCHITECTURE.md).
 | Dependabot | actif — npm + github-actions (mensuel, groupé) |
 | Sentry | câblé par le template, activé uniquement sur Vercel |
 | Docker Compose | actif — Postgres local |
-| Graphe de dépendances | à la demande — `pnpm graph` (dependency-cruiser via `pnpm dlx`) |
+| Graphe de dépendances | `pnpm graph` — dependency-cruiser en dépendance de développement (D-007) |
 
 ## Commandes
 
