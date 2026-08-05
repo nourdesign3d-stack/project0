@@ -136,7 +136,10 @@ test.describe("parcours authentifié", () => {
 
     expect(
       landing?.status(),
-      "la page authentifiée renvoie une erreur serveur"
+      "la page authentifiée n'est pas servie. Un 404 signale presque toujours " +
+        "un compte de test sans organisation active : l'application refuse " +
+        "l'accès aux données hors organisation, et c'est voulu — voir " +
+        "docs/QUALITY_GATES.md, « Parcours authentifié »"
     ).toBeLessThan(400);
   });
 });

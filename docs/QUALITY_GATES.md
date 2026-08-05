@@ -54,6 +54,13 @@ adresse de test (`…+clerk_test@example.com`), le code est fixe et documenté p
 fournisseur ; aucun e-mail n'est réellement envoyé. Sans `E2E_USER_OTP`, le test échoue
 avec un message explicite plutôt que sur un délai d'attente.
 
+⚠️ **Le compte de test doit appartenir à une organisation, et elle doit être active.**
+Le produit est multi-tenant : `apps/app` refuse l'accès aux données hors organisation
+(`if (!orgId) notFound()`). Un compte créé sans organisation se connecte correctement puis
+reçoit un **404** sur la page d'accueil — comportement voulu, mais qui ressemble à une
+panne quand on l'ignore. Dans le tableau de bord Clerk : activer *Organizations*, en créer
+une, y ajouter le compte de test.
+
 Vérifié le 2026-08-05 sur un projet jetable — voir D-018.
 
 ## Règles de gate
