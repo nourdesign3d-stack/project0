@@ -5,6 +5,10 @@ import {
   clerkClient,
   type OrganizationMembership,
 } from "@repo/auth/server";
+import { z } from "zod";
+
+// Frontière serveur : la liste vient du client, elle est bornée avant usage.
+const USER_IDS = z.array(z.string().min(1).max(100)).max(100);
 
 const getName = (user: OrganizationMembership): string | undefined => {
   let name = user.publicUserData?.firstName;
@@ -55,6 +59,12 @@ export const getUsers = async (
       throw new Error("Not logged in");
     }
 
+    const parsed = USER_IDS.safeParse(userIds);
+
+    if (!parsed.success) {
+      return { data: [] };
+    }
+
     const clerk = await clerkClient();
 
     const members = await clerk.organizations.getOrganizationMembershipList({
@@ -66,7 +76,7 @@ export const getUsers = async (
       .filter(
         (user) =>
           user.publicUserData?.userId &&
-          userIds.includes(user.publicUserData.userId)
+          parsed.data.includes(user.publicUserData.userId)
       )
       .map((user) => ({
         name: getName(user) ?? "Unknown user",

@@ -15,9 +15,10 @@ packages/database/generated/
 # Types générés par le CMS.
 packages/cms/basehub-types.d.ts
 
-# Composants shadcn/ui régénérables par `pnpm bump-ui` : ce ne sont pas nos sources.
-# Toute correction faite ici serait écrasée à la prochaine régénération.
-packages/design-system/components/ui/
+# Les composants shadcn/ui NE sont PAS exclus : ils sont compilés et livrés aux
+# utilisateurs, donc analysés comme le reste. Mesuré le 2026-08-05 : 0 constat
+# sur 452 cibles. Ils restent exclus du lint Biome (style, 669 écarts, écrasés à
+# chaque `pnpm bump-ui`) — la sécurité et le style ne se traitent pas pareil.
 
 # Rapports de test : peuvent contenir des traces, jamais du code applicatif.
 playwright-report/

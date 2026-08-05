@@ -30,6 +30,10 @@
   "files": {
     "includes": [
       "**/*",
+      // Composants générés par shadcn et régénérés par `pnpm bump-ui`.
+      // Mesuré le 2026-08-05 : 669 écarts de style, tous écrasés à la prochaine
+      // régénération. Exclus du lint (style), mais PAS de Semgrep (sécurité) —
+      // voir .semgrepignore.
       "!packages/design-system/components/ui",
       "!packages/design-system/lib",
       "!packages/design-system/hooks",

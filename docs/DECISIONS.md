@@ -111,6 +111,44 @@ seul outil de graphe.
 
 ---
 
+## D-013 — Suites de l'audit indépendant : ce qui est corrigé, ce qui est reporté
+
+**Date** : 2026-08-05
+**Contexte** : un audit externe a rendu un verdict « NON UTILISABLE » sur trois failles
+(protections agent contournables, données personnelles journalisées, cron public en
+écriture). Les trois ont été vérifiées et corrigées (voir commit `656f036`). Restaient
+cinq constats de niveau IMPORTANT, dont deux engagent l'architecture.
+
+**Décision — corrigé maintenant**, parce que mesurable et vérifiable sans clés de service :
+
+- autorisation **avant** l'accès aux données dans les deux pages authentifiées, avec un
+  rappel du filtre de tenant à ajouter dès que `Page` deviendra une entité métier ;
+- validation Zod aux frontières serveur : formulaire de contact public (nom, e-mail,
+  message bornés), recherche d'utilisateurs, récupération d'utilisateurs ;
+- tests de refus des frontières publiques : 4 cas sur le cron, 4 sur le webhook Clerk —
+  dont un test qui échoue si le corps de l'événement réapparaît dans les journaux ;
+- composants shadcn **réintégrés à l'analyse Semgrep**. Mesuré : 0 constat sur 452 cibles,
+  donc aucune raison de les exclure. Ils restent hors du lint Biome : 669 écarts de style,
+  tous écrasés au prochain `pnpm bump-ui`. Sécurité et style ne se traitent pas pareil,
+  et les deux exclusions portent désormais la mesure en commentaire.
+
+**Décision — reporté explicitement**, parce que non vérifiable en l'état :
+
+- **idempotence des webhooks** (R-012) : elle exige de mémoriser les identifiants traités,
+  donc un modèle Prisma et une migration. Livrer une table que tout projet hériterait sans
+  l'avoir choisie, avant même qu'un modèle métier existe, est le contraire de ce que fait
+  cette graine. À traiter au premier projet qui consomme réellement des webhooks.
+- **`auth.protect()` dans le proxy** (R-013) : sans clés Clerk, impossible de constater le
+  comportement réel. Trois routes doivent rester joignables
+  (`/.well-known/vercel/flags`, `/api/collaboration/auth`, `/sign-in`) : une liste
+  d'exclusions écrite à l'aveugle casserait le produit ou donnerait une fausse sécurité.
+  La documentation dit désormais franchement que le proxy ne protège rien.
+
+**Conséquences** : les deux reports sont inscrits dans `RISKS.md` avec leur cause et leur
+condition de levée, plutôt que dissimulés dans du code non exécuté.
+
+---
+
 ## D-012 — Démarrage d'une copie : plomberie automatisée, décisions laissées à l'humain
 
 **Date** : 2026-08-05

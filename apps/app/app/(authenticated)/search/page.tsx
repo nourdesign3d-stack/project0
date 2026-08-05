@@ -1,7 +1,11 @@
 import { auth } from "@repo/auth/server";
 import { database } from "@repo/database";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { Header } from "../components/header";
+
+// `searchParams` vient du client : borné et normalisé avant d'atteindre la base.
+const SEARCH_QUERY = z.string().trim().min(1).max(100);
 
 interface SearchPageProperties {
   searchParams: Promise<{
@@ -21,23 +25,31 @@ export const generateMetadata = async ({
 };
 
 const SearchPage = async ({ searchParams }: SearchPageProperties) => {
-  const { q } = await searchParams;
-  const pages = await database.page.findMany({
-    where: {
-      name: {
-        contains: q,
-      },
-    },
-  });
+  // Autoriser, puis valider l'entrée, puis seulement interroger la base.
+  // Voir .claude/rules/security.md.
   const { orgId } = await auth();
 
   if (!orgId) {
     notFound();
   }
 
-  if (!q) {
+  const { q } = await searchParams;
+  const query = SEARCH_QUERY.safeParse(q);
+
+  if (!query.success) {
     redirect("/");
   }
+
+  // TODO(domaine) : ajouter le filtre de tenant (`orgId`) dès que `Page`
+  // devient une entité métier — invariant INV-001.
+  const pages = await database.page.findMany({
+    where: {
+      name: {
+        contains: query.data,
+      },
+    },
+    take: 50,
+  });
 
   return (
     <>

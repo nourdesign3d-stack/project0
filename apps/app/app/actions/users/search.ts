@@ -6,6 +6,10 @@ import {
   type OrganizationMembership,
 } from "@repo/auth/server";
 import Fuse from "fuse.js";
+import { z } from "zod";
+
+// Frontière serveur : l'entrée vient du client, elle est bornée avant usage.
+const SEARCH_QUERY = z.string().trim().min(1).max(100);
 
 const getName = (user: OrganizationMembership): string | undefined => {
   let name = user.publicUserData?.firstName;
@@ -36,6 +40,12 @@ export const searchUsers = async (
       throw new Error("Not logged in");
     }
 
+    const parsed = SEARCH_QUERY.safeParse(query);
+
+    if (!parsed.success) {
+      return { data: [] };
+    }
+
     const clerk = await clerkClient();
 
     const members = await clerk.organizations.getOrganizationMembershipList({
@@ -55,7 +65,7 @@ export const searchUsers = async (
       threshold: 0.3,
     });
 
-    const results = fuse.search(query);
+    const results = fuse.search(parsed.data);
     const data = results.map((result) => result.item.id);
 
     return { data };

@@ -18,6 +18,9 @@ Statut : `ouvert` / `atténué` / `accepté` / `fermé`.
 | R-010 | Aucune revue de ce qui part vers Sentry / BetterStack (fuite potentielle de donnée personnelle) | élevée | moyenne | `.claude/rules/security.md` impose le filtrage ; non implémenté | à désigner | ouvert |
 | R-011 | `main` sans protection **côté serveur** : dépôt privé sur plan GitHub gratuit, branches protégées et rulesets refusés (403). Une fusion sans CI verte reste techniquement possible | moyenne | moyenne | hook `pre-push` local versionné (`.githooks/`, `pnpm hooks:install`) refusant les pushs directs — contournable, ne remplace pas une règle serveur ; règle serveur prête à appliquer (DEPLOYMENT.md) | propriétaire du dépôt | **accepté** (décision du 2026-08-05 : rester privé sans plan payant) |
 
+| R-012 | Webhooks non idempotents : un événement Clerk ou Stripe rejoué est traité plusieurs fois (analytics faussées, effets de bord dupliqués) | moyenne | haute | signature vérifiée et testée ; **aucune mémorisation des événements traités** — exige un modèle de données que la graine n'a pas encore | à désigner | ouvert |
+| R-013 | `apps/app/proxy.ts` n'appelle pas `auth.protect()` : toute route ajoutée hors du layout authentifié est publique | élevée | moyenne | documenté dans ARCHITECTURE.md et SECURITY_MODEL.md ; décision reportée faute de clés Clerk pour vérifier le comportement | à désigner | ouvert |
+
 ## Revue
 
 Ce tableau est relu à chaque `/release-readiness` et à chaque `/vibe`. Un risque ne se

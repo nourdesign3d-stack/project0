@@ -23,12 +23,18 @@ export const metadata: Metadata = {
 };
 
 const App = async () => {
-  const pages = await database.page.findMany();
+  // Autoriser AVANT de lire : le layout parent redirige, mais un layout n'est
+  // pas une autorisation au niveau de l'accès aux données, et pages et layouts
+  // peuvent être évalués en parallèle. Voir .claude/rules/security.md.
   const { orgId } = await auth();
 
   if (!orgId) {
     notFound();
   }
+
+  // TODO(domaine) : quand `Page` deviendra une entité métier, ce `findMany`
+  // devra porter le filtre de tenant (`where: { orgId }`) — invariant INV-001.
+  const pages = await database.page.findMany();
 
   return (
     <>
