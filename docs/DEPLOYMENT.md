@@ -164,10 +164,10 @@ Sans elles, le démarrage et le build échouent — comportement voulu.
 `CLERK_WEBHOOK_SECRET` (`whsec_…`), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `BASEHUB_TOKEN`, `RESEND_TOKEN`, `RESEND_FROM`, `SVIX_TOKEN`,
 `LIVEBLOCKS_SECRET`, `KNOCK_*`, `UPSTASH_REDIS_REST_*`, `FLAGS_SECRET`,
-`BETTERSTACK_*`, `SENTRY_ORG`, `SENTRY_PROJECT`, `NEXT_PUBLIC_SENTRY_DSN`,
+`BETTERSTACK_API_KEY` et `BETTERSTACK_URL` (produit **Uptime**), `BETTER_STACK_SOURCE_TOKEN` et `BETTER_STACK_INGESTING_URL` (**journaux** — noms imposés par `@logtail/next`, D-028), `SENTRY_ORG`, `SENTRY_PROJECT`, `NEXT_PUBLIC_SENTRY_DSN`,
 `NEXT_PUBLIC_POSTHOG_*`, `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
 
-⚠️ **Une variable optionnelle laissée à `""` échoue la validation Zod** (ex. `BETTERSTACK_URL=""`
+⚠️ **Une variable optionnelle laissée à `""` échoue la validation Zod** (ex. `BETTER_STACK_INGESTING_URL=""`
 n'est pas une URL valide). La commenter tant qu'elle n'a pas de valeur réelle.
 
 ⚠️ `VERCEL_PROJECT_PRODUCTION_URL` attend un **hôte sans schéma** (`localhost:3000`), le

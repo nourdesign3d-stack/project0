@@ -76,8 +76,10 @@ seule protection est la vérification de signature.
 - Aucune politique de sauvegarde/restauration de la base n'est définie ni testée.
 - La revue de ce qui part vers **Sentry** a été faite le 2026-08-05, au collecteur local
   (D-026) : les transactions emportaient en-tête d'autorisation, cookie, corps et jeton
-  d'URL — corrigé et re-mesuré. Restent non observés : le canal `log` de Sentry (R-022) et
-  **tout** ce qui part vers BetterStack.
+  d'URL — corrigé et re-mesuré. **BetterStack** a été observé le même jour (D-028) : il ne recevait rien — les variables
+  documentées n'étaient pas celles que la bibliothèque lit. Une fois corrigé, il expédie le
+  message **et tous les champs structurés en clair**. Reste non filtré : le canal `log` de
+  Sentry et celui de BetterStack (R-022).
 - Aucun test de sécurité automatisé au-delà de Semgrep (pas de DAST, pas de fuzzing).
 
 Suivi : [RISKS.md](./RISKS.md).

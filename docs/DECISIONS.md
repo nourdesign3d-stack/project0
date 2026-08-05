@@ -111,6 +111,61 @@ seul outil de graphe.
 
 ---
 
+## D-028 — BetterStack : deux produits, deux configurations, une seule présente
+
+**Date** : 2026-08-05
+**Contexte** : `packages/observability` déclarait `BETTERSTACK_API_KEY` et
+`BETTERSTACK_URL`, et `docs/DEPLOYMENT.md` les présentait comme la configuration de la
+journalisation. Elles ne le sont pas : elles servent le produit **Uptime** — clé d'API des
+moniteurs et adresse de la page de statut, lues par `status/index.tsx` et affichées dans le
+pied de page public.
+
+La journalisation passe par `@logtail/next`, qui ne lit **aucune de ces orthographes**. La
+chaîne `BETTERSTACK` n'apparaît nulle part dans son code. Il attend
+`BETTER_STACK_SOURCE_TOKEN` et `BETTER_STACK_INGESTING_URL`
+(`dist/platform/generic.js`) — **absentes du dépôt depuis l'origine** — et **se rabat
+silencieusement sur un affichage console** quand elles manquent.
+
+Conséquence : un projet qui renseignait consciencieusement les variables documentées
+croyait envoyer ses journaux. Rien ne partait, et rien ne le signalait.
+
+**Erreur d'analyse corrigée en chemin** : j'ai d'abord conclu que les deux variables
+existantes étaient mortes, et je les ai renommées. Le typecheck a immédiatement cassé sur
+`status/index.tsx`. Elles n'étaient pas mortes — elles étaient **mal documentées**. La
+correction n'est donc pas un renommage mais un **ajout**, et le maintien des deux familles
+côte à côte, chacune commentée avec le produit qu'elle sert.
+
+**Mesure**, au collecteur local, même méthode que pour Sentry (D-026) :
+
+| Variables posées | Requêtes reçues |
+| --- | --- |
+| `BETTERSTACK_API_KEY` + `BETTERSTACK_URL` (celles de la graine) | **0** |
+| `BETTER_STACK_SOURCE_TOKEN` + `BETTER_STACK_INGESTING_URL` | **1** |
+
+**Décision** : ajouter `BETTER_STACK_SOURCE_TOKEN` et `BETTER_STACK_INGESTING_URL` à
+`keys.ts` et aux trois `.env.example`, à côté des variables Uptime, chaque famille
+commentée avec le produit qu'elle sert. Deux produits distincts d'un même fournisseur
+méritaient d'être distingués ; les confondre a coûté une intégration silencieusement
+inopérante.
+
+**Garde-fou** : `apps/api/__tests__/observability-keys.test.ts` exige les quatre variables
+et empêche qu'une famille chasse l'autre. Il ne teste pas le SDK — il teste que ce que nous
+**déclarons** correspond à ce qu'il lit, exactement là où la faute s'était logée.
+
+**Ce que la mesure a montré d'autre** : une fois correctement configuré, le SDK expédie le
+message **et tous les champs structurés en clair**. Aucun filtrage, aucune rédaction. La
+règle « ne jamais journaliser de donnée sensible » cesse d'être une hygiène locale : elle
+protège un flux vers un tiers. Même constat que R-022 pour le canal `log` de Sentry.
+
+**Symétrie utile à retenir** : sur Sentry, on croyait que rien ne partait et beaucoup
+partait. Sur BetterStack, on croyait que tout partait et rien ne partait. Deux erreurs
+opposées, une seule cause — une affirmation jamais vérifiée.
+
+**Limite** : mesuré contre un collecteur local, pas contre BetterStack. Ce qui est prouvé,
+c'est *qu'une requête part et ce qu'elle contient*, pas que le service l'accepte.
+
+---
+
 ## D-027 — Sauvegarde : un mécanisme répété, pas une procédure écrite
 
 **Date** : 2026-08-05
