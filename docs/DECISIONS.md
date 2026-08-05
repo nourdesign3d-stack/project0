@@ -111,6 +111,27 @@ seul outil de graphe.
 
 ---
 
+## D-020 — Versionner la migration initiale
+
+**Date** : 2026-08-05
+**Contexte** : `schema.prisma` décrivait `Page`, mais aucune migration n'était versionnée.
+Trois conséquences, toutes invisibles jusqu'à la première connexion réussie : une base
+fraîche n'avait aucune table, `pnpm migrate:deploy` n'appliquait rien dans un environnement
+déployé, et le job e2e ne pouvait pas tester le parcours authentifié — la seule
+alternative, `prisma db push`, est interdite par `.claude/rules/database.md` hors
+prototypage local.
+**Décision** : versionner `20260805135910_init` (création de `Page`). La graine décrit
+désormais un schéma **reproductible partout**.
+**Conséquences** : `migrate:deploy` applique la migration — vérifié sur la base locale, la
+table est créée. `vibe0` continue d'appeler `migrate dev`, qui applique la migration
+existante et n'en crée une nouvelle que si le schéma a été modifié.
+**Objection considérée** : versionner une migration pour un modèle de démonstration
+destiné à disparaître. Retenue quand même — un schéma qu'aucun environnement ne sait
+recréer est un défaut plus grave qu'une migration initiale à remplacer. Quand `Page`
+cédera la place au vrai modèle, la migration suivante se génère normalement.
+
+---
+
 ## D-019 — R-013 : un test, pas un middleware
 
 **Date** : 2026-08-05

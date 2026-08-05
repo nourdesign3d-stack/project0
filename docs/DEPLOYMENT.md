@@ -9,14 +9,35 @@
 | `quality` | install figé → `prisma generate` → `lint` → `typecheck` → `test` → `test:hooks` → `test:scripts` → `test:launcher` → `boundaries` → build `app` + `api` | toujours |
 | `semgrep` | analyse statique de sécurité (conteneur officiel Semgrep) | toujours |
 | `build-full` | `pnpm build` complet (inclut `@repo/cms` et `apps/web`) | `vars.ENABLE_FULL_BUILD == 'true'` **et** secret `BASEHUB_TOKEN` configuré |
-| `e2e` | Playwright sur les parcours critiques | `vars.ENABLE_E2E == 'true'` |
+| `e2e` | Postgres éphémère → `migrate:deploy` → Playwright démarre l'app et joue les parcours critiques | `vars.ENABLE_E2E == 'true'` |
 
 Permissions : `contents: read` au niveau du workflow. Aucun job de test n'obtient
 d'autorisation d'écriture.
 
 Pour activer les jobs conditionnels : *Settings → Secrets and variables → Actions →
-Variables* → `ENABLE_FULL_BUILD` / `ENABLE_E2E` = `true`, après avoir renseigné les secrets
-correspondants.
+Variables* → `ENABLE_FULL_BUILD` / `ENABLE_E2E` = `true`, **après** avoir renseigné les
+secrets correspondants. Poser la variable d'abord ne rend pas le job vert : il s'exécute
+et échoue.
+
+### Secrets attendus par le job `e2e`
+
+Cinq secrets, à créer soi-même (`gh secret set <NOM>`, la valeur est demandée à la saisie
+et ne transite ni par un fichier ni par l'historique du shell) :
+
+| Secret | Rôle | Si absent |
+| --- | --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | instance Clerk **de développement** | l'application démarre, les parcours anonymes passent |
+| `CLERK_SECRET_KEY` | idem, côté serveur | idem |
+| `E2E_USER_EMAIL` | compte de test — jamais un compte réel | parcours authentifié **sauté** |
+| `E2E_USER_PASSWORD` | son mot de passe | parcours authentifié **sauté** |
+| `E2E_USER_OTP` | code de vérification d'appareil | parcours authentifié **en échec** avec un message explicite |
+
+Le job fournit lui-même le reste : un service Postgres éphémère, `migrate:deploy`, et
+`E2E_START_SERVER=true` qui laisse Playwright démarrer `apps/app`. Aucune URL de
+préversion n'est donc nécessaire.
+
+Un compte de test dont l'adresse se termine par `+clerk_test@example.com` évite tout envoi
+d'e-mail réel et accepte un code de vérification fixe, documenté par Clerk.
 
 ## Protection de `main`
 
@@ -144,12 +165,16 @@ pnpm migrate:deploy           # application en environnement déployé
 
 `pnpm db:push` est réservé au prototypage local jetable (bloqué pour l'agent).
 
-⚠️ **La graine ne versionne aucune migration** : `schema.prisma` décrit la table `Page`,
-mais une base fraîche est vide. Sans migration, la page d'accueil authentifiée — qui
-interroge `Page` — renvoie une erreur serveur dès la première connexion réussie. Le défaut
-était invisible tant que personne ne franchissait `/sign-in` (D-018). `vibe0` applique
-donc le schéma juste après avoir démarré Postgres ; en dehors de `vibe0`, c'est
-`pnpm migrate --name init` qu'il faut lancer une fois.
+La migration initiale (`20260805135910_init`, création de `Page`) est **versionnée**
+depuis le 2026-08-05 : sans elle, une base fraîche restait vide et la page d'accueil
+authentifiée — qui interroge `Page` — renvoyait une erreur serveur dès la première
+connexion réussie, tandis que `migrate:deploy` n'appliquait rien nulle part. Le défaut
+était invisible tant que personne ne franchissait `/sign-in` (D-018, D-020).
+
+`vibe0` applique le schéma juste après avoir démarré Postgres. En dehors de `vibe0` :
+`pnpm migrate:deploy` sur un environnement déployé, `pnpm migrate` en développement.
+Quand le stub `Page` sera remplacé par le vrai modèle, la migration suivante se génère
+normalement — la migration initiale n'est pas à modifier.
 
 `packages/database/prisma.config.ts` charge lui-même `.env.local` puis `.env` : Prisma 7
 ne le fait plus automatiquement quand un fichier de configuration est présent. Sans cela,
