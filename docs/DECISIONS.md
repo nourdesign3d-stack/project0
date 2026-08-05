@@ -111,6 +111,44 @@ seul outil de graphe.
 
 ---
 
+## D-014 — Arcjet retiré, Nosecone conservé
+
+**Date** : 2026-08-05
+**Contexte** : `packages/security` mélangeait deux briques du même éditeur —
+**Nosecone** (en-têtes de sécurité, sans clé ni compte) et **Arcjet** (bot/WAF, sur clé).
+Arcjet n'a jamais été actif : sans `ARCJET_KEY`, `secure()` retournait immédiatement.
+Le propriétaire du produit a jugé que l'offre ne répondrait pas à son besoin.
+
+Une hypothèse à corriger dans mon raisonnement : j'ai d'abord cru que retirer Arcjet
+débloquerait `pnpm dedupe`, bloqué par `trustPolicy: no-downgrade` sur
+`@arcjet/next@1.2.0`. **C'est faux** : une fois Arcjet retiré, `resend@6.18.1` bloque à
+son tour, pour le même motif. `pnpm dedupe` est incompatible avec cette politique de
+confiance sur cet arbre de dépendances, indépendamment d'Arcjet. Le retrait ne se
+justifie donc que par ses mérites propres, pas par cet effet de bord espéré.
+
+**Décision** : retirer `@arcjet/next` de `packages/security` et de `apps/web`, supprimer
+`secure()` et ses deux appels (`apps/app/app/(authenticated)/layout.tsx`,
+`apps/web/proxy.ts`), retirer `ARCJET_KEY` des schémas et des `.env.example`.
+**Nosecone reste** : les en-têtes de sécurité ne coûtent rien et protègent réellement.
+
+**Conséquence assumée** : plus aucune protection contre les bots ni pare-feu applicatif.
+Toute route publique ou coûteuse doit se borner elle-même — taille, durée, fréquence,
+limitation de débit. Consigné en R-003.
+
+**Pour revenir en arrière** :
+
+```bash
+pnpm --filter @repo/security add @arcjet/next
+```
+
+puis restaurer `secure()` depuis l'historique (`git log -- packages/security/index.ts`),
+et remettre `ARCJET_KEY` dans `packages/security/keys.ts` et les `.env.example`.
+
+**Vérifié** : `pnpm verify` complet après retrait — lint 310 fichiers, typecheck
+24 workspaces, tests, 50 cas du garde-fou, 10 cas des scripts, frontières, build app + api.
+
+---
+
 ## D-013 — Suites de l'audit indépendant : ce qui est corrigé, ce qui est reporté
 
 **Date** : 2026-08-05

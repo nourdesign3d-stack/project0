@@ -1,13 +1,11 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { z } from "zod";
 
+// Plus aucune variable : la protection Arcjet a été retirée (D-014).
+// Le fichier est conservé pour que le contrat du package reste stable si une
+// variable de sécurité réapparaît.
 export const keys = () =>
   createEnv({
     skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
-    server: {
-      ARCJET_KEY: z.string().startsWith("ajkey_").optional(),
-    },
-    runtimeEnv: {
-      ARCJET_KEY: process.env.ARCJET_KEY,
-    },
+    server: {},
+    runtimeEnv: {},
   });
