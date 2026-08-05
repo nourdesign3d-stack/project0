@@ -35,7 +35,11 @@ trustPolicyExclude:
   # Le signal est une **perte d'attestation de provenance** entre deux versions,
   # pas une preuve de compromission : l'éditeur publie de façon irrégulière.
   # Un contrôle qui empêche d'appliquer un correctif de sécurité protège moins
-  # qu'il ne coûte. À réexaminer si chokidar retrouve une attestation.
+  # qu'il ne coûte.
+  #
+  # ÉCHÉANCE : à réexaminer avant le 2026-11-05 (trois mois). Vérifier si chokidar
+  # a retrouvé une attestation de provenance ; si oui, retirer cette ligne. Le
+  # contrôle est rappelé par la commande /vibe.
   - chokidar
 
 # Interdit l'installation de dépendances transitives depuis des sources exotiques
