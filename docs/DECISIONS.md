@@ -111,6 +111,44 @@ seul outil de graphe.
 
 ---
 
+## D-030 — Stripe vérifié en livraison réelle
+
+**Date** : 2026-08-05
+**Contexte** : D-022 avait éprouvé la vérification de signature contre la **spécification**,
+en signant les corps de test à la main. Restait à savoir si une signature réellement émise
+par Stripe passe, et si l'idempotence (D-023) tient avec de vrais identifiants d'événement.
+
+**Méthode** : clé de test dans un projet jetable, `stripe listen --forward-to` vers
+`apps/api`, événements provoqués par `stripe trigger`. Base **Neon**, pour que la mémoire
+d'idempotence soit celle d'un vrai serveur et non d'un conteneur local.
+
+| Contrôle | Résultat |
+| --- | --- |
+| Signature émise par Stripe | **200** — 7 événements distincts acceptés |
+| Signature forgée | **400** |
+| Aucune signature | **400** |
+| Rejeu spontané par Stripe | « événement déjà traité », **non retraité** |
+| Rejeu explicite (`stripe events resend`) | idem |
+| Table `WebhookEvent` | **7 lignes, 7 identifiants distincts** malgré les rejeux |
+| Erreurs de traitement ou de réservation | **aucune** |
+
+**Ce que cela confirme** : les correctifs de D-022 (le `400` au lieu du `500`, qui évitait
+des réessais inutiles de Stripe) et l'idempotence de D-023 fonctionnent en conditions
+réelles, pas seulement contre des corps signés à la main.
+
+**Ce qui reste non exercé, et doit être dit** :
+
+- le **rapprochement client** : `handleCheckoutSessionCompleted` a bien été appelé, mais
+  aucun utilisateur Clerk ne porte de `stripeCustomerId`. La branche qui balaie les comptes
+  (R-020) n'a donc jamais tourné pour de vrai ;
+- **Connect** : rien n'est implémenté (D-029), donc rien n'est vérifié — ni le routage par
+  `event.account`, ni les charges directes ;
+- la **facturation** elle-même : aucun abonnement, aucun paiement récurrent.
+
+R-006 perd sa dernière mention de Stripe. Restent non exécutés : **BaseHub** et le
+package **IA**.
+---
+
 ## D-029 — Paiements : Billing pour notre revenu, Connect **Standard** pour celui des clients
 
 **Date** : 2026-08-05
