@@ -39,6 +39,48 @@ La règle à appliquer alors — PR obligatoire, checks requis `Lint · Typechec
 et `Semgrep`, historique linéaire, force-push et suppression interdits — est prête et
 n'attend que le déblocage du plan. Suivi : risque R-011 dans `RISKS.md`.
 
+## Alertes de vulnérabilité
+
+Activées le 2026-08-05. GitHub compare l'arbre de dépendances à sa base de failles et
+affiche les correspondances dans l'onglet *Security*. **Rien ne bouge tout seul** : les
+correctifs automatiques ne sont pas activés.
+
+À l'activation : **30 alertes** (8 hautes, 20 moyennes, 2 basses), concentrées sur trois
+paquets — `next` (41 occurrences, corrigé en 16.2.6), `hono` et `undici`, ces deux derniers
+transitifs. Une alerte ≠ un problème : le compteur affiche des occurrences, pas des causes.
+
+### Règle de tri — pour ne pas tourner en rond
+
+1. **Grouper par paquet, pas par alerte.** Une montée de version efface souvent des
+   dizaines de lignes d'un coup.
+2. **Traiter en priorité** ce qui est atteignable en production : dépendance directe,
+   `runtime`, sur un chemin réellement exécuté. Une faille dans un outil de développement
+   ou une dépendance transitive non appelée attend le cycle Dependabot mensuel.
+3. **Une seule passe par mois**, en même temps que les PR Dependabot. Pas de traitement au
+   fil de l'eau : c'est ce qui transforme les alertes en tapis roulant.
+4. **Décider et écrire.** Une alerte qu'on choisit de ne pas traiter devient une ligne dans
+   `RISKS.md` avec sa raison. Sans cela, on la réexamine tous les mois.
+5. **Aucune montée de version sans `pnpm verify` vert**, et sans passer par une pull request.
+
+## Discipline de contribution
+
+Depuis le 2026-08-05, tout changement passe par une branche et une pull request :
+
+```bash
+git switch -c <type>/<sujet>
+# … modifications, puis :
+pnpm verify
+git push -u origin HEAD
+gh pr create --fill
+# fusion seulement une fois la CI verte :
+gh pr merge --squash --delete-branch
+```
+
+Le bénéfice n'est pas la revue — le dépôt peut n'avoir qu'un seul mainteneur — c'est que
+`main` ne reçoive jamais un commit dont la CI n'est pas passée. Le hook `pre-push` refuse
+les pushs directs ; l'échappatoire `ALLOW_DIRECT_PUSH_MAIN=1` reste réservée à la création
+initiale d'un dépôt.
+
 ## Variables d'environnement
 
 Chaque app possède son `.env.example` (versionné, **sans valeur**) et son `.env.local`
