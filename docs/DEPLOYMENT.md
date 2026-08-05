@@ -144,6 +144,13 @@ pnpm migrate:deploy           # application en environnement déployé
 
 `pnpm db:push` est réservé au prototypage local jetable (bloqué pour l'agent).
 
+⚠️ **La graine ne versionne aucune migration** : `schema.prisma` décrit la table `Page`,
+mais une base fraîche est vide. Sans migration, la page d'accueil authentifiée — qui
+interroge `Page` — renvoie une erreur serveur dès la première connexion réussie. Le défaut
+était invisible tant que personne ne franchissait `/sign-in` (D-018). `vibe0` applique
+donc le schéma juste après avoir démarré Postgres ; en dehors de `vibe0`, c'est
+`pnpm migrate --name init` qu'il faut lancer une fois.
+
 `packages/database/prisma.config.ts` charge lui-même `.env.local` puis `.env` : Prisma 7
 ne le fait plus automatiquement quand un fichier de configuration est présent. Sans cela,
 toutes les commandes Prisma échouent sur « Connection url is empty ». La configuration

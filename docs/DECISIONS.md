@@ -111,6 +111,71 @@ seul outil de graphe.
 
 ---
 
+## D-019 — R-013 : un test, pas un middleware
+
+**Date** : 2026-08-05
+**Contexte** : R-013 était avéré — une route posée hors du groupe `(authenticated)`
+répondait `200` à un appel anonyme. Le réflexe est d'ajouter `auth.protect()` dans
+`apps/app/proxy.ts`, avec une liste de routes publiques. Ce correctif a été écrit,
+puis **retiré**.
+
+Motif du retrait : à la première exécution, Clerk 7 a émis un avertissement de
+dépréciation sur `createRouteMatcher`, en donnant précisément la raison qui fait R-013 —
+la protection par correspondance de chemins « peut diverger du routage réel de Next.js et
+laisser des ressources protégées joignables ». Le correctif aurait donc apporté une
+confiance fausse, et disparaîtra à la prochaine version majeure du fournisseur. Sa
+recommandation rejoint `.claude/rules/security.md` : contrôler au plus près de la donnée.
+
+**Décision** : `proxy.ts` reste du **routage**, ce que ARCHITECTURE.md affirmait déjà.
+L'autorisation reste dans les layouts, pages, route handlers et server actions. Le risque
+réel — l'oubli — est traité par un test qui le rend **détectable** :
+`apps/app/__tests__/route-protection.test.ts` parcourt `app/`, et échoue pour toute route
+qui n'a ni contrôle d'autorisation (dans le fichier ou un layout parent) ni entrée
+justifiée dans `PUBLIC_ROUTES`.
+
+**Conséquences** : le test a été **vu échouer** sur le scénario exact de R-013 (`probe/route.ts`
+sans contrôle), avec un message nommant la route et l'action à mener. Deux tests
+l'accompagnent : une entrée périmée dans `PUBLIC_ROUTES` échoue aussi (une exception doit
+rester examinée), et un jeu de routes vide échoue (sans quoi une erreur de chemin
+rendrait le tout vert en n'analysant rien).
+
+**Limite assumée** : ce test constate la *présence* d'un contrôle, pas sa *justesse*. Un
+`auth()` dont on ignore le résultat le satisfait. Il ferme l'oubli, pas l'erreur.
+
+---
+
+## D-018 — Vérifier les services tiers sur un projet jetable, jamais sur la graine
+
+**Date** : 2026-08-05
+**Contexte** : quatre chemins restaient non exécutés faute de clés de service (R-006,
+R-008, R-013, H-007). Les tester dans la graine y aurait introduit des clés, une
+instance Clerk et une base peuplée — exactement le résidu que `project:init` s'efforce
+d'éliminer (R-017).
+**Décision** : créer un projet **jetable** avec `vibe0`, y saisir des clés de
+développement, exécuter le parcours, puis reporter les seuls **constats** dans la graine
+par pull request. Aucune clé, aucun identifiant, aucune donnée ne remonte.
+**Conséquences** — la première exécution réelle a révélé quatre défauts qu'aucune
+relecture n'avait vus, parce qu'aucun d'eux n'est visible sans franchir `/sign-in` :
+
+1. `getByLabel(/password/i)` visait aussi le bouton « Show password » de Clerk, et
+   `getByRole("button", {name: /continue|sign in/i})` aussi « Continue with Google » :
+   Playwright refusait d'agir. Libellés désormais **ancrés**.
+2. Clerk interpose une **vérification d'appareil** (code à usage unique) entre le mot de
+   passe et la session — donc à chaque exécution en CI, où la machine est toujours neuve.
+   Le test ne la connaissait pas ; il l'assume maintenant via `E2E_USER_OTP`.
+3. Un refus du fournisseur se présentait comme « l'URL n'a pas changé », la vraie cause
+   restant dans le rapport HTML. Le message du fournisseur est désormais relevé et jeté.
+4. Aucune migration n'est versionnée : une base fraîche n'a **aucune table**, alors que
+   la page d'accueil authentifiée interroge `Page`. `vibe0` applique maintenant le schéma
+   après avoir démarré Postgres, et le test e2e recharge la page pour constater qu'elle
+   ne renvoie pas une erreur serveur — quitter `/sign-in` ne prouvait rien.
+
+Mesure obtenue : parcours authentifié **5/5**, et R-013 confirmé (une route hors du
+groupe `(authenticated)` répond `200` à un anonyme). Ce qui reste non exécuté — Stripe,
+BaseHub, Sentry, IA — le reste explicitement.
+
+---
+
 ## D-017 — Garde-fou Bash : tokenisation, après deux contournements d'audit
 
 **Date** : 2026-08-05
