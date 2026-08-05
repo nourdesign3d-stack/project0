@@ -56,7 +56,7 @@ Détail des responsabilités : [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 Clerk (authentification), Prisma + Neon (données), Stripe (paiement), BaseHub (CMS),
 Resend (e-mail), Knock (notifications), Liveblocks (collaboration), PostHog / Google
-Analytics, Arcjet + Nosecone (sécurité), Upstash (limitation de débit), Svix (webhooks
+Analytics, Nosecone (en-têtes de sécurité), Upstash (limitation de débit), Svix (webhooks
 sortants), Sentry + BetterStack (observabilité), Vercel Blob (stockage).
 
 Toutes sont **câblées mais inertes** tant que leurs clés ne sont pas fournies.
@@ -67,13 +67,28 @@ Le dépôt ne contient plus d'identifiant en dur : les règles Semgrep, le hook,
 conteneurs Docker et le graphe sont neutres. Seuls le nom du paquet racine et le titre de
 ce README portent le nom du projet, et ils sont écrits par un script.
 
+Une fois pour toutes, rendre la commande disponible partout :
+
 ```bash
-git clone --local <ce-dossier> ../mon-projet   # ne copie que les fichiers versionnés
-cd ../mon-projet
-pnpm project:init --name mon-projet --port 5433
-pnpm install                                   # active aussi les hooks Git
-docker compose up -d
-pnpm verify
+pnpm vibe0:install
+```
+
+Ensuite, pour chaque nouveau projet :
+
+```bash
+mkdir mon-projet && cd mon-projet && vibe0
+```
+
+`vibe0` clone la graine dans le dossier courant — qui doit être **vide** — puis déroule
+l'amorçage : nom, port libre, remise à zéro du journal, fichiers d'environnement, clés en
+saisie masquée, installation, base de données, vérification. Les actions irréversibles
+(historique Git, dépôt distant) arrivent en dernier, à « non » par défaut.
+
+Sans installation globale, la voie longue reste valable :
+
+```bash
+git clone --local <ce-dossier> ../mon-projet
+cd ../mon-projet && pnpm vibe0
 ```
 
 ⚠️ **Ne pas copier avec `cp -R`.** Un audit l'a démontré : la copie transporte les

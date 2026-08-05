@@ -59,6 +59,9 @@ jobs:
       - name: Tests des scripts d'amorçage
         run: pnpm test:scripts
 
+      - name: Tests du lanceur vibe0
+        run: pnpm test:launcher
+
       - name: Frontières entre workspaces
         run: pnpm boundaries
 
