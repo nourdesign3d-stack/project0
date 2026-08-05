@@ -499,14 +499,23 @@ cases.push({
  * contrôle du contenu) a été exécuté à la main et est décrit dans
  * `docs/RECOVERY.md` — il exige un conteneur et une base, pas une fixture.
  */
-const runScript = (root, script, args) => {
+const runScript = (root, script, args, env = {}) => {
+  // L'environnement est fourni explicitement : la CI définit `DATABASE_URL` au
+  // niveau du workflow, et un cas qui reposait sur son absence passait en local
+  // pour échouer là-bas. Un test ne doit pas dépendre de ce qui l'entoure.
+  const options = {
+    cwd: root,
+    env: { ...process.env, ...env },
+    stdio: ["pipe", "pipe", "pipe"],
+  };
+
   try {
     return {
       status: 0,
       output: execFileSync(
         process.execPath,
         [join(root, "scripts", script), ...args],
-        { cwd: root, stdio: ["pipe", "pipe", "pipe"] }
+        options
       ).toString(),
     };
   } catch (error) {
@@ -590,7 +599,9 @@ cases.push({
 cases.push({
   name: "db:backup : explique l'absence de DATABASE_URL",
   run: (root) => {
-    const { status, output } = runScript(root, "db-backup.mjs", []);
+    const { status, output } = runScript(root, "db-backup.mjs", [], {
+      DATABASE_URL: "",
+    });
 
     assert(status === 1, "la sauvegarde a été tentée sans cible");
     assert(
