@@ -17,3 +17,21 @@ model Page {
   id   Int    @id @default(autoincrement())
   name String
 }
+
+/// Événements de webhook déjà traités — garantit l'idempotence (R-012).
+///
+/// Ce modèle n'est **pas** du domaine : il est d'infrastructure, et ne suppose
+/// rien du produit. C'est pourquoi il peut exister avant le modèle métier.
+///
+/// La clé primaire composite **est** le contrôle : une seconde insertion du même
+/// événement échoue en base. Un `findFirst` suivi d'un `create` serait une
+/// course, pas une garantie — voir .claude/rules/database.md.
+model WebhookEvent {
+  /// Fournisseur émetteur : "clerk", "stripe"…
+  provider   String
+  /// Identifiant de **livraison** du fournisseur, stable d'un réessai à l'autre.
+  eventId    String
+  receivedAt DateTime @default(now())
+
+  @@id([provider, eventId])
+}

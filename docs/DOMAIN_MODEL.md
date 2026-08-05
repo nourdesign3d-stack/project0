@@ -17,8 +17,9 @@ Rôles internes, permissions par rôle et hiérarchie : **non définis**.
 | Entité | Modèle Prisma | Statut |
 | --- | --- | --- |
 | `Page` | `packages/database/prisma/schema.prisma` | **stub de démonstration**, à supprimer dès qu'un vrai modèle existe |
+| `WebhookEvent` | `packages/database/prisma/schema.prisma` | **infrastructure, pas domaine** : mémoire des livraisons déjà traitées (idempotence, D-023). Ne suppose rien du produit et n'a pas à figurer dans le modèle métier |
 
-Aucune autre entité persistée.
+Aucune autre entité persistée. **Aucune entité de domaine n'existe encore.**
 
 ## États et transitions
 

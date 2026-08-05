@@ -10,9 +10,25 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
  */
 
 let requestHeaders: Record<string, string> = {};
+let configured = true;
 
 const verify = vi.fn();
 const logInfo = vi.fn();
+const createEvent = vi.fn();
+const deleteEvent = vi.fn();
+
+const duplicate = () => Object.assign(new Error("unique"), { code: "P2002" });
+
+// La mémoire d'idempotence est simulée, mais la **logique** qui l'utilise ne
+// l'est pas : `lib/idempotency.ts` est chargé pour de vrai.
+vi.mock("@repo/database", () => ({
+  database: {
+    webhookEvent: {
+      create: (...args: unknown[]) => createEvent(...args),
+      delete: (...args: unknown[]) => deleteEvent(...args),
+    },
+  },
+}));
 
 vi.mock("svix", () => ({
   Webhook: class {
@@ -47,7 +63,9 @@ vi.mock("@repo/observability/log", () => ({
 }));
 
 vi.mock("@/env", () => ({
-  env: { CLERK_WEBHOOK_SECRET: "whsec_test" },
+  get env() {
+    return { CLERK_WEBHOOK_SECRET: configured ? "whsec_test" : undefined };
+  },
 }));
 
 const SIGNED_HEADERS = {
@@ -69,8 +87,13 @@ const post = async (body: string, headers: Record<string, string>) => {
 describe("webhook Clerk", () => {
   beforeEach(() => {
     vi.resetModules();
+    configured = true;
     verify.mockReset();
     logInfo.mockReset();
+    createEvent.mockReset();
+    createEvent.mockResolvedValue(undefined);
+    deleteEvent.mockReset();
+    deleteEvent.mockResolvedValue(undefined);
   });
 
   test("refuse une requête sans en-têtes Svix", async () => {
@@ -101,6 +124,46 @@ describe("webhook Clerk", () => {
     await post(raw, SIGNED_HEADERS);
 
     expect(verify).toHaveBeenCalledWith(raw, expect.anything());
+  });
+
+  test("réserve la livraison, pas la ressource", async () => {
+    // La clé est `svix-id`, identifiant de **livraison** : Svix conserve le même
+    // d'un réessai à l'autre. L'identifiant de la ressource est partagé par tous
+    // les événements qui la concernent — l'utiliser confondrait une création et
+    // une mise à jour du même utilisateur.
+    verify.mockReturnValue({ type: "user.created", data: { id: "user_1" } });
+
+    await post('{"type":"user.created"}', SIGNED_HEADERS);
+
+    expect(createEvent).toHaveBeenCalledWith({
+      data: { provider: "clerk", eventId: "msg_1" },
+    });
+  });
+
+  test("ne retraite pas une livraison déjà reçue", async () => {
+    createEvent.mockRejectedValue(duplicate());
+    verify.mockReturnValue({ type: "user.created", data: { id: "user_1" } });
+
+    const response = await post('{"type":"user.created"}', SIGNED_HEADERS);
+
+    expect(response.status).toBe(200);
+  });
+
+  test("refuse de traiter si la mémoire d'idempotence est indisponible", async () => {
+    createEvent.mockRejectedValue(new Error("base injoignable"));
+    verify.mockReturnValue({ type: "user.created", data: { id: "user_1" } });
+
+    const response = await post('{"type":"user.created"}', SIGNED_HEADERS);
+
+    expect(response.status).toBe(503);
+  });
+
+  test("signale une absence de configuration au lieu de l'acquitter", async () => {
+    configured = false;
+
+    const response = await post('{"type":"user.created"}', SIGNED_HEADERS);
+
+    expect(response.status).toBe(503);
   });
 
   test("ne journalise jamais le corps de l'événement", async () => {
