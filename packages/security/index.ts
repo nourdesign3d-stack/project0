@@ -1,50 +1,15 @@
-import arcjet, {
-  type ArcjetBotCategory,
-  type ArcjetWellKnownBot,
-  detectBot,
-  request,
-  shield,
-} from "@arcjet/next";
-import { keys } from "./keys";
+/**
+ * Ce package fournit désormais uniquement les **en-têtes de sécurité**
+ * (Nosecone, sans clé ni compte) — voir `proxy.ts`.
+ *
+ * La protection bot/WAF Arcjet a été retirée le 2026-08-05 : elle n'a jamais été
+ * active faute de clé, et son offre ne correspondait pas au besoin exprimé.
+ * Marche à suivre pour la remettre : docs/DECISIONS.md D-014.
+ *
+ * **Conséquence à assumer** : aucune protection contre les bots, aucun pare-feu
+ * applicatif. Les routes publiques ou coûteuses doivent être protégées
+ * autrement — limitation de débit (`@repo/rate-limit`), validation stricte des
+ * entrées, bornes de taille, de durée et de fréquence. Voir docs/RISKS.md R-003.
+ */
 
-const arcjetKey = keys().ARCJET_KEY;
-
-export const secure = async (
-  allow: (ArcjetWellKnownBot | ArcjetBotCategory)[],
-  sourceRequest?: Request
-) => {
-  if (!arcjetKey) {
-    return;
-  }
-
-  const base = arcjet({
-    // Get your site key from https://app.arcjet.com
-    key: arcjetKey,
-    // Identify the user by their IP address
-    characteristics: ["ip.src"],
-    rules: [
-      // Protect against common attacks with Arcjet Shield
-      shield({
-        // Will block requests. Use "DRY_RUN" to log only
-        mode: "LIVE",
-      }),
-      // Other rules are added in different routes
-    ],
-  });
-
-  const req = sourceRequest ?? (await request());
-  const aj = base.withRule(detectBot({ mode: "LIVE", allow }));
-  const decision = await aj.protect(req);
-
-  if (decision.isDenied()) {
-    if (decision.reason.isBot()) {
-      throw new Error("No bots allowed");
-    }
-
-    if (decision.reason.isRateLimit()) {
-      throw new Error("Rate limit exceeded");
-    }
-
-    throw new Error("Access denied");
-  }
-};
+export { keys } from "./keys";

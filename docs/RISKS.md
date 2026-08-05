@@ -8,7 +8,7 @@ Statut : `ouvert` / `atténué` / `accepté` / `fermé`.
 | --- | --- | --- | --- | --- | --- | --- |
 | R-001 | Aucun modèle métier ni invariant défini : tout code écrit maintenant repose sur des suppositions | élevée | haute | `.claude/rules/project-domain.md` interdit d'inventer ; `ASSUMPTIONS.md` trace les hypothèses | propriétaire produit | ouvert |
 | R-002 | `relationMode = "prisma"` : aucune clé étrangère appliquée par la base — intégrité référentielle à la charge de l'application | élevée | haute | règle explicite dans `.claude/rules/database.md` + axe dédié dans `/blind-spot-review` | à désigner | ouvert |
-| R-003 | Aucune clé de service provisionnée : Arcjet (WAF/bot) et rate-limit sont **inactifs** | élevée | haute | aucun | à désigner | ouvert |
+| R-003 | **Aucune protection bot/WAF** : Arcjet retiré (D-014), limitation de débit inactive faute de clé Upstash. Une route publique coûteuse est exposée à l'abus | élevée | haute | aucun contrôle automatique ; bornes à écrire dans le code de chaque route exposée | à désigner | **ouvert, assumé** |
 | R-004 | Aucune politique de sauvegarde ni de restauration testée | critique | moyenne | aucune | à désigner | ouvert |
 | R-005 | Dérive de versions du template : les dépendances en `^` ont dépassé les API utilisées par next-forge 6.0.3 (Clerk Core 3, AI SDK v6, Knock, Stripe agent toolkit, recharts 3, react-resizable-panels 4) | moyenne | **avérée** | corrections appliquées, `pnpm typecheck` à 0 erreur, Dependabot mensuel groupé | à désigner | atténué |
 | R-006 | Corrections de dérive non validées à l'exécution (aucune clé de service pour tester Clerk/Stripe/IA) | moyenne | moyenne | consignées dans `DECISIONS.md`, hypothèse H-007 | à désigner | ouvert |

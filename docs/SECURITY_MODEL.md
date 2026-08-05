@@ -49,7 +49,7 @@ seule protection est la vérification de signature.
 | Authentification | Clerk (`packages/auth`) | actif, non configuré (clés absentes) |
 | Protection de routes | aucune au niveau proxy — `apps/app/proxy.ts` n'appelle pas `auth.protect()` ; seule la redirection du layout authentifié protège les pages | **à traiter** |
 | En-têtes de sécurité | Nosecone (`packages/security`) | actif |
-| Bot / WAF | Arcjet (`packages/security`) | câblé, clé absente |
+| Bot / WAF | **aucun** — Arcjet retiré le 2026-08-05 (D-014) | **absent, assumé** |
 | Limitation de débit | Upstash (`packages/rate-limit`) | câblé, clé absente |
 | Validation des variables d'environnement | Zod + `@t3-oss/env-nextjs` | actif |
 | Vérification de signature webhook | Clerk / Stripe / Svix dans `apps/api` | actif |
@@ -65,14 +65,14 @@ seule protection est la vérification de signature.
 | Autorisation absente sur une action serveur | **critique** | convention `.claude/rules/security.md` | revue systématique, tests négatifs |
 | Rejeu de webhook / double traitement | élevée | signature vérifiée | idempotence à implémenter par cas d'usage |
 | Fuite de secret (log, trace, artefact) | élevée | deny Read sur `.env*`, Semgrep `p/secrets` | filtrage explicite avant Sentry |
-| Abus de route coûteuse (IA, upload, recherche) | élevée | Arcjet + rate-limit non configurés | activer les clés, borner taille/durée/fréquence |
+| Abus de route coûteuse (IA, upload, recherche) | élevée | **aucun** : plus de bot/WAF, rate-limit non configuré | borner taille, durée et fréquence dans le code ; activer la limitation de débit |
 | Contenu CMS non fiable rendu tel quel | moyenne | React échappe par défaut | interdire `dangerouslySetInnerHTML` non assaini |
 | Dépendance compromise | moyenne | Dependabot, lockfile figé en CI | revue des mises à jour majeures |
 
 ## Risques non traités
 
-- Aucune clé de service n'est provisionnée : les protections Arcjet et rate-limit sont
-  **inactives en pratique**.
+- Plus aucune protection bot/WAF : Arcjet a été retiré. La limitation de débit reste
+  inactive faute de clé. Toute route publique ou coûteuse doit se protéger elle-même.
 - Aucune politique de sauvegarde/restauration de la base n'est définie ni testée.
 - Aucune revue de journalisation n'a été faite (quels champs partent vers Sentry/BetterStack).
 - Aucun test de sécurité automatisé au-delà de Semgrep (pas de DAST, pas de fuzzing).
