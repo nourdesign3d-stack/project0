@@ -111,6 +111,43 @@ seul outil de graphe.
 
 ---
 
+## D-015 — react-email 5 → 6, et exception nommée à la politique de confiance
+
+**Date** : 2026-08-05
+**Contexte** : 28 alertes de vulnérabilité visaient `next@16.1.6`, alors que les
+applications tournent en 16.2.12. Je les ai d'abord prises pour des fantômes issus d'une
+entrée orpheline du lockfile — **deux fois, à tort**. Une purge chirurgicale a été tentée :
+`pnpm install --frozen-lockfile` l'a refusée aussitôt (`Broken lockfile`), ce qui a révélé
+la vraie cause. Ma vérification cherchait la chaîne `next@16.1.6` ; les références internes
+du lockfile s'écrivent `next: 16.1.6(…)`. Le coupable réel :
+`@react-email/preview-server@5.2.9`, qui **dépend** de `next@16.1.6`.
+
+**Décision** : monter `apps/email` en `react-email@6.9.1`, qui ne dépend plus de Next.
+La v6 sort l'interface de prévisualisation dans `@react-email/ui`, qu'elle propose
+d'installer **interactivement** au premier lancement — inacceptable dans un script ou en
+CI : le paquet est donc déclaré explicitement. `@react-email/preview-server` est retiré.
+
+Pourquoi cette option plutôt que les deux autres :
+
+- *supprimer `apps/email`* contredirait le principe de la graine — quelles intégrations
+  garder est la première décision du **projet dérivé**, pas celle du squelette ;
+- *garder 5.2.9* ferait hériter à chaque copie 28 vulnérabilités réelles et un `next`
+  périmé dans l'arbre, qui polluerait tous les tris d'alertes ultérieurs.
+
+**Exception à la politique de confiance.** La montée était bloquée par
+`trustPolicy: no-downgrade` sur `chokidar@4.0.3`. Ce contrôle a écarté quatre paquets en
+une semaine (`@langchain/core`, `@arcjet/next`, `resend`, `chokidar`) : il est utile, mais
+il refuse aussi des correctifs de sécurité. Un contrôle qui empêche d'appliquer un
+correctif protège moins qu'il ne coûte. Plutôt que de le désarmer, `trustPolicyExclude`
+reçoit une exception **nommée, datée et motivée** — même discipline qu'un `nosemgrep`.
+Le signal sur chokidar est une perte d'attestation de provenance entre deux versions,
+pas une preuve de compromission.
+
+**Vérifié** : `next@16.1.6` a disparu du lockfile ; la prévisualisation démarre et répond
+**HTTP 200** sur le port 3003 en React Email 6.9.1 ; `pnpm verify` complet au vert.
+
+---
+
 ## D-014 — Arcjet retiré, Nosecone conservé
 
 **Date** : 2026-08-05

@@ -53,11 +53,9 @@ fermé **252**. Il en reste **88** : 28 sur `next` (fantômes, voir ci-dessous),
 Sans `--paginate`, on lit une taille de page et on la prend pour un total. Première
 lecture faussée de cette manière.
 
-⚠️ **Alertes fantômes** : les 28 alertes restantes sur `next` visent des versions
-inférieures à celle installée (16.2.12). Elles proviennent d'une entrée orpheline
-`next@16.1.6` dans la section des résolutions du lockfile, que rien ne référence.
-Ni `pnpm install` ni `--fix-lockfile` ne la purgent ; `pnpm dedupe` le ferait mais échoue
-sur `trustPolicy: no-downgrade` (voir R-015).
+Les 28 alertes qui visaient `next` provenaient de `@react-email/preview-server@5.2.9`,
+qui dépendait de `next@16.1.6`. Elles étaient **réelles**, pas fantômes : la montée de
+`react-email` en 6.9.1 a retiré `next` de cet arbre.
 
 ### Règle de tri — pour ne pas tourner en rond
 
