@@ -111,6 +111,97 @@ seul outil de graphe.
 
 ---
 
+## D-029 — Paiements : Billing pour notre revenu, Connect **Standard** pour celui des clients
+
+**Date** : 2026-08-05
+**Statut** : direction arrêtée, **rien n'est implémenté**. Aucun code de cette décision
+n'existe encore dans le dépôt.
+
+**Contexte** : deux besoins de paiement se ressemblent et n'ont rien à voir.
+
+1. Nous facturons nos clients, mensuellement. L'argent nous appartient.
+2. Nos clients encaissent **leurs** clients. L'argent ne nous appartient pas.
+
+Le second fait de nous une **plateforme**, avec les obligations et l'exposition qui vont
+avec. Le scénario examiné pour trancher était une plateforme de gestion de restaurants —
+les restaurants encaissent les convives. ⚠️ Ce scénario a servi à raisonner ; **il
+n'établit pas le domaine du produit**, qui reste indéfini (R-001). Si c'est bien le produit,
+c'est au propriétaire de renseigner `docs/PROJECT_CONTEXT.md`.
+
+**Décision** :
+
+| Flux | Produit Stripe | Où va l'argent |
+| --- | --- | --- |
+| notre abonnement mensuel | **Billing**, sur notre compte | notre solde |
+| paiement du client final | **Connect Standard**, charges **directes** | directement au client, jamais par notre solde |
+
+Les deux flux restent **séparés**. C'est cette séparation qui rend la comptabilité
+lisible : notre chiffre d'affaires est constitué de nos abonnements, et les fonds de nos
+clients ne transitent jamais par notre solde.
+
+**Pourquoi Standard, et pas Express** — c'est l'arbitrage central, et il porte sur une
+seule question : **qui absorbe un solde négatif**.
+
+Une contestation de paiement peut arriver jusqu'à 120 jours après la transaction, alors que
+les fonds ont été versés depuis longtemps. Si le compte du client est vide ou fermé,
+quelqu'un absorbe la perte. En Express et en Custom, c'est la plateforme. En Standard, c'est
+le client, qui a son propre contrat avec Stripe.
+
+Le scénario qui décide n'est pas le client honnête en difficulté, mais le **faux client** :
+inscription, encaissement avec des cartes volées, versement, disparition, contestations un
+mois plus tard. En Express, c'est notre trésorerie — et le contrôle de qui l'on embarque
+devient un dispositif financier, pas une formalité.
+
+Cette exposition n'est **pas mesurable** aujourd'hui : ni volume, ni typologie de clients,
+ni historique. On ne provisionne pas un risque qu'on ne sait pas chiffrer. Standard le
+supprime.
+
+**Ce que Standard coûte, et qui est assumé** :
+
+- inscription plus lourde — création d'un vrai compte Stripe : pièce d'identité, numéro
+  d'entreprise, IBAN. Une partie des clients abandonnera en route ;
+- aucun levier de versement différé, aucune réserve ;
+- le client peut **nous déconnecter** quand il veut : toute fonctionnalité fondée sur son
+  historique de transactions s'éteint ce jour-là ;
+- image de marque : inscription, e-mails et tableau de bord sont ceux de Stripe.
+
+**Ce que Standard apporte** : aucune responsabilité sur les pertes, aucune obligation de
+vérification d'identité de notre côté, les frais Stripe payés par le client — donc une
+tarification plus simple — et le cas fréquent du client **qui a déjà un compte Stripe**,
+pour qui l'inscription se réduit à une autorisation.
+
+**Conséquences pour la graine** — aucune n'est traitée à ce jour :
+
+- un `stripeAccountId` **sur l'organisation**, donc une entité de domaine que la graine n'a
+  pas (R-001). Connect ne peut pas être écrit avant le modèle métier ;
+- un routage des webhooks par le champ `account` de l'événement : sans lui, un paiement
+  encaissé par un client serait traité comme le nôtre. Le gestionnaire actuel ignore
+  totalement cette notion ;
+- **R-020 devient faux** en Connect : retrouver un utilisateur à partir d'un identifiant
+  client Stripe suppose un espace d'identifiants unique, ce que Connect n'a pas — chaque
+  compte connecté a le sien.
+
+**Séquencement** : Billing d'abord, il ne dépend d'aucune entité métier. Connect ensuite,
+une fois les entités connues.
+
+**Ce qui reste à décider** : prendre ou non une commission par transaction
+(`application_fee_amount`) — réversible, sans migration ; et le moment d'ouvrir Connect.
+
+**Ce qui n'est pas réversible sans douleur** : qui est le commerçant et qui porte les
+pertes. C'est contractuel vis-à-vis des clients finaux, cela touche les relevés bancaires
+et les litiges, et en changer impose de faire repasser chaque client par une inscription.
+Standard → Express est particulièrement pénible : le compte appartient au client, pas à
+nous.
+
+**Réserves** : Stripe décrit désormais Connect par des **propriétés de contrôle** — qui
+porte les pertes, qui paie les frais, qui accède au tableau de bord — plutôt que par les
+trois types historiques, et l'inscription hébergée s'est élargie au-delà de l'OAuth.
+Le raisonnement tient, les termes exacts et les combinaisons autorisées sont à vérifier
+dans la documentation à jour avant de figer le tunnel d'inscription. Les questions de
+responsabilité réglementaire relèvent de Stripe et d'un conseil, pas de ce document.
+
+---
+
 ## D-028 — BetterStack : deux produits, deux configurations, une seule présente
 
 **Date** : 2026-08-05
