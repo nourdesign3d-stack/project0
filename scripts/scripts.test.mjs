@@ -26,6 +26,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { withValue } from "./lib/env-file.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..");
@@ -35,14 +36,20 @@ const LOCAL_ENV = `.env${".local"}`;
 const makeFixture = () => {
   const root = mkdtempSync(join(tmpdir(), "seed-scripts-"));
 
-  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "scripts/lib"), { recursive: true });
   mkdirSync(join(root, "docs/_skeletons"), { recursive: true });
   mkdirSync(join(root, "apps/app"), { recursive: true });
+
+  copyFileSync(
+    join(repo, "scripts/lib/env-file.mjs"),
+    join(root, "scripts/lib/env-file.mjs")
+  );
 
   for (const script of [
     "project-init.mjs",
     "setup-env.mjs",
     "install-hooks.mjs",
+    "set-env.mjs",
   ]) {
     copyFileSync(join(repo, "scripts", script), join(root, "scripts", script));
   }
@@ -316,6 +323,167 @@ check("un port invalide est refusé", (root) => {
   }
 
   assert(refused, "un port invalide a été accepté");
+});
+
+// --- set-env ----------------------------------------------------------------
+
+/**
+ * La saisie de la valeur exige un terminal : ces cas couvrent tout ce qui la
+ * précède — validation des arguments, recherche des fichiers concernés — et le
+ * refus explicite hors TTY. Sans eux, une faute de frappe dans le nom de la
+ * variable passerait pour un succès silencieux.
+ */
+const setEnv = (root, args) => {
+  try {
+    return {
+      status: 0,
+      output: execFileSync(
+        process.execPath,
+        [join(root, "scripts", "set-env.mjs"), ...args],
+        { cwd: root, stdio: ["pipe", "pipe", "pipe"] }
+      ).toString(),
+    };
+  } catch (error) {
+    return {
+      status: error.status,
+      output: `${error.stdout?.toString() ?? ""}${error.stderr?.toString() ?? ""}`,
+    };
+  }
+};
+
+cases.push({
+  name: "set-env : refuse un nom de variable invalide",
+  run: (root) => {
+    for (const argument of [[], ["database_url"], ["1FOO"]]) {
+      const { status, output } = setEnv(root, argument);
+
+      assert(
+        status === 1,
+        `sortie inattendue pour ${JSON.stringify(argument)}`
+      );
+      assert(output.includes("Usage"), "l'usage n'est pas rappelé");
+    }
+  },
+});
+
+cases.push({
+  name: "set-env : signale une variable que personne ne déclare",
+  run: (root) => {
+    const { status, output } = setEnv(root, ["VARIABLE_ABSENTE"]);
+
+    assert(status === 1, "une variable inconnue a été acceptée");
+    assert(
+      output.includes("Aucun .env.local ne déclare"),
+      "le motif du refus n'est pas explicite"
+    );
+  },
+});
+
+cases.push({
+  name: "set-env : liste les fichiers concernés avant de refuser hors terminal",
+  run: (root) => {
+    // La fixture ne contient pas de .env.local : on en pose un.
+    writeFileSync(
+      join(root, "apps/app", LOCAL_ENV),
+      'DATABASE_URL=""\n# STRIPE_SECRET_KEY=\n'
+    );
+
+    const { status, output } = setEnv(root, ["DATABASE_URL"]);
+
+    assert(status === 1, "la saisie a été tentée sans terminal");
+    assert(
+      output.includes(join("apps", "app", LOCAL_ENV)),
+      "le fichier concerné n'est pas annoncé"
+    );
+    assert(
+      output.includes("interactif"),
+      "l'exigence de terminal n'est pas expliquée"
+    );
+  },
+});
+
+cases.push({
+  name: "set-env : reconnaît une variable commentée",
+  run: (root) => {
+    // `setup-env.mjs` commente les variables sans valeur : ce sont exactement
+    // celles que l'on vient renseigner. Les ignorer rendrait l'outil inutile.
+    writeFileSync(join(root, "apps/app", LOCAL_ENV), "# STRIPE_SECRET_KEY=\n");
+
+    const { output } = setEnv(root, ["STRIPE_SECRET_KEY"]);
+
+    assert(
+      output.includes("1 fichier(s)"),
+      "une variable commentée n'a pas été reconnue"
+    );
+  },
+});
+
+cases.push({
+  name: "set-env : écrit la valeur, guillemets compris",
+  run: () => {
+    const written = withValue(
+      'DATABASE_URL=""\nAUTRE=1\n',
+      "DATABASE_URL",
+      "postgresql://u:p@h/db?sslmode=require&channel_binding=require"
+    );
+
+    assert(
+      written.includes(
+        'DATABASE_URL="postgresql://u:p@h/db?sslmode=require&channel_binding=require"'
+      ),
+      "la valeur n'est pas écrite entre guillemets"
+    );
+    assert(written.includes("AUTRE=1"), "le reste du fichier a été altéré");
+  },
+});
+
+cases.push({
+  name: "set-env : ne laisse aucune déclaration périmée derrière lui",
+  run: () => {
+    // `dotenv` retient la **dernière** définition : ne remplacer que la première
+    // laisserait une valeur périmée qui écraserait silencieusement la nouvelle.
+    const written = withValue(
+      '# DATABASE_URL=\nAUTRE=1\nDATABASE_URL="ancienne"\n',
+      "DATABASE_URL",
+      "nouvelle"
+    );
+
+    assert(!written.includes("ancienne"), "une déclaration périmée subsiste");
+    assert(
+      !written.includes("# DATABASE_URL="),
+      "la déclaration commentée subsiste"
+    );
+  },
+});
+
+cases.push({
+  name: "set-env : ne confond pas deux variables de préfixe commun",
+  run: () => {
+    const written = withValue(
+      'DATABASE_URL=""\nDATABASE_URL_REPLICA="intacte"\n',
+      "DATABASE_URL",
+      "nouvelle"
+    );
+
+    assert(
+      written.includes('DATABASE_URL_REPLICA="intacte"'),
+      "une variable au préfixe commun a été écrasée"
+    );
+  },
+});
+
+cases.push({
+  name: "set-env : refuse un dossier racine inexistant",
+  run: (root) => {
+    const { status, output } = setEnv(root, [
+      "DATABASE_URL",
+      "--root",
+      join(root, "nulle-part"),
+    ]);
+
+    assert(status === 1, "un dossier inexistant a été accepté");
+    assert(output.includes("introuvable"), "le motif du refus est muet");
+  },
 });
 
 // --- Exécution --------------------------------------------------------------

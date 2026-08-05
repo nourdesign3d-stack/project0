@@ -130,6 +130,13 @@ initiale d'un dépôt.
 Chaque app possède son `.env.example` (versionné, **sans valeur**) et son `.env.local`
 (non versionné).
 
+`pnpm env:set <VARIABLE>` renseigne une variable dans **tous** les `.env.local` qui la
+déclarent, en saisie masquée. La valeur ne transite ni par l'historique du shell — que le
+réflexe `echo "…" >> .env.local` alimente durablement — ni par un agent. Le script ne
+touche jamais un fichier qui ne déclare pas déjà la variable, et remplace **toutes** ses
+déclarations : `dotenv` retient la dernière, donc en laisser une périmée plus bas
+écraserait silencieusement la valeur écrite.
+
 `pnpm env:setup` crée les `.env.local` manquants à partir des `.env.example` : il commente
 les variables sans valeur (sinon la validation Zod échoue) et renseigne `DATABASE_URL`
 depuis le `.env` racine. Il **n'écrase jamais** un fichier existant sans `--force`.
