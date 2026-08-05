@@ -59,6 +59,12 @@ depuis le `.env` racine. Il **n'écrase jamais** un fichier existant sans `--for
 
 Sans elles, le démarrage et le build échouent — comportement voulu.
 
+### Requise si le cron est utilisé
+
+| Variable | Format | Conséquence si absente |
+| --- | --- | --- |
+| `CRON_SECRET` | chaîne libre, envoyée par Vercel Cron en `Authorization: Bearer …` | `/cron/keep-alive` répond **503** et ne réveille plus la base : sur Neon, l'instance finit par se suspendre. Le silence est le symptôme. |
+
 ### Optionnelles mais structurantes
 
 `CLERK_SECRET_KEY` (`sk_…`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_…`),

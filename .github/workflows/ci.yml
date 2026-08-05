@@ -51,6 +51,14 @@ jobs:
       - name: Unit & integration tests
         run: pnpm test
 
+      # Contrôles qui gardent les gardes : sans eux, une régression dans le
+      # garde-fou Bash ou dans les frontières passerait inaperçue.
+      - name: Tests du garde-fou Bash
+        run: pnpm test:hooks
+
+      - name: Frontières entre workspaces
+        run: pnpm boundaries
+
       # Build restreint aux apps qui ne dépendent pas d'un service tiers.
       # Le build complet (apps/web → @repo/cms → BaseHub) est dans le job `build-full`.
       - name: Build (app, api)
@@ -61,8 +69,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container:
-      # Image épinglée : une image flottante peut changer les règles exécutées
-      # d'un run à l'autre, ou exécuter du code non revu dans la CI.
+      # Image épinglée. Attention : cela fige le moteur, PAS les règles — les
+      # packs p/… sont téléchargés du registre Semgrep à chaque exécution, donc
+      # deux runs identiques peuvent différer. Écart assumé (voir RISKS.md).
       image: semgrep/semgrep:1.171.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -121,6 +130,10 @@ jobs:
           E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # Sans ces deux secrets, le parcours authentifié reste sauté — le job
+          # serait vert sans jamais avoir testé une connexion.
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
 
       # Les rapports peuvent contenir des captures d'écran : ne jamais y laisser de secret.
       - name: Rapport Playwright

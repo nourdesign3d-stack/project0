@@ -1,8 +1,14 @@
-import { render } from "@testing-library/react";
 import { expect, test } from "vitest";
-import Page from "../app/(unauthenticated)/sign-up/[[...sign-up]]/page";
+import Page, {
+  metadata,
+} from "../app/(unauthenticated)/sign-up/[[...sign-up]]/page";
 
-test("Sign Up Page", () => {
-  const { container } = render(<Page />);
-  expect(container).toBeDefined();
+// Même raison que sign-in.test.tsx : on vérifie ce qui est vérifiable sans clé.
+test("compose des métadonnées à partir du titre de la page", () => {
+  expect(String(metadata.title)).toContain("Create an account");
+  expect(metadata.description).toBe("Enter your details to get started.");
+});
+
+test("exporte un composant de page", () => {
+  expect(typeof Page).toBe("function");
 });

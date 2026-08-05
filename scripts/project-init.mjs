@@ -21,6 +21,7 @@ import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -138,6 +139,46 @@ if (existsSync(graph)) {
   if (!args.dryRun) {
     rmSync(graph, { recursive: true, force: true });
   }
+}
+
+// 6. Résidus du projet source.
+//
+// Un `cp -R` transporte les fichiers non versionnés : .env.local (clés réelles et
+// DATABASE_URL du projet précédent), .clerk (instance Clerk éphémère), .turbo
+// (cache, plusieurs Go). Sans traitement, le projet neuf lit et migre la base de
+// l'ancien — constaté en audit. Un changement de nom prouve qu'on n'est plus dans
+// le projet d'origine : ses fichiers d'environnement n'ont plus rien à faire ici.
+const renamed = previousName !== name;
+
+const inheritedEnv = ["apps", "packages"].flatMap((group) => {
+  const base = join(root, group);
+  if (!existsSync(base)) {
+    return [];
+  }
+  return readdirSync(base)
+    .map((entry) => join(group, entry, ".env.local"))
+    .filter((path) => existsSync(join(root, path)));
+});
+
+const EPHEMERAL = [".clerk", ".turbo"];
+
+if (renamed && !args.dryRun) {
+  for (const path of inheritedEnv) {
+    rmSync(join(root, path), { force: true });
+  }
+
+  for (const path of EPHEMERAL) {
+    if (existsSync(join(root, path))) {
+      actions.push(`${path}/ (résidu du projet source, supprimé)`);
+      rmSync(join(root, path), { recursive: true, force: true });
+    }
+  }
+}
+
+if (renamed && inheritedEnv.length > 0) {
+  actions.push(
+    `${inheritedEnv.length} fichier(s) d'environnement du projet « ${previousName} » supprimés puis régénérés`
+  );
 }
 
 const out = process.stdout;

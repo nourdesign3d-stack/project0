@@ -68,13 +68,22 @@ conteneurs Docker et le graphe sont neutres. Seuls le nom du paquet racine et le
 ce README portent le nom du projet, et ils sont écrits par un script.
 
 ```bash
-cp -R <ce-dossier> ../mon-projet          # sans node_modules ni .next
+git clone --local <ce-dossier> ../mon-projet   # ne copie que les fichiers versionnés
 cd ../mon-projet
 pnpm project:init --name mon-projet --port 5433
-pnpm install                              # active aussi les hooks Git
+pnpm install                                   # active aussi les hooks Git
 docker compose up -d
 pnpm verify
 ```
+
+⚠️ **Ne pas copier avec `cp -R`.** Un audit l'a démontré : la copie transporte les
+fichiers non versionnés — `.env.local` (clés réelles et `DATABASE_URL` du projet source),
+`.clerk/`, et un cache `.turbo` de plusieurs gigaoctets. Le projet neuf lit et migre alors
+la base de l'ancien. `git clone --local` ne prend que ce qui est versionné.
+
+Si une copie brute a quand même eu lieu, `project:init` la rattrape : dès que le nom du
+projet change, il supprime les environnements hérités, `.clerk/` et `.turbo/`, puis
+régénère les `.env.local` à partir des `.env.example`.
 
 `project:init` inscrit le nom, remet les **six documents « journal »** de `docs/` à leur
 squelette (`docs/_skeletons/`), écrit le `.env` de Docker Compose, génère les

@@ -96,10 +96,29 @@ const DESTRUCTIVE = [
     why: "action sur un environnement déployé",
   },
   {
-    pattern: /\b(env|printenv)\s*$/,
+    // Ancré en début de commande : `\benv$` attrapait aussi une redirection
+    // vers un fichier dont le nom se termine par « env ».
+    pattern: /(^|[|;&]\s*)(env|printenv)\s*$/,
     why: "affichage de l'environnement complet",
   },
 ];
+
+// Commandes qui ouvrent, lisent ou recopient le contenu d'un fichier.
+const READS_FILES =
+  /\b(cat|bat|less|more|head|tail|nl|od|xxd|strings|base64|rg|ag|grep|egrep|fgrep|awk|sed|cut|sort|uniq|cp|scp|rsync|mv|tar|zip|gzip|open|code|pbcopy|source|dotenv|jq|yq)\b/;
+
+// `rm -rf /tmp/…` dans un bac à sable n'est pas la même chose que dans le dépôt.
+const TEMPORARY = /^(\/private)?\/(tmp|var\/folders)\//;
+
+const WHITESPACE = /\s+/;
+
+const onlyTemporaryPaths = (command) => {
+  const operands = command
+    .split(WHITESPACE)
+    .filter((token) => token.startsWith("/") || token.startsWith("~"));
+
+  return operands.length > 0 && operands.every((path) => TEMPORARY.test(path));
+};
 
 const readStdin = async () => {
   const chunks = [];
@@ -128,20 +147,40 @@ try {
   }
 
   const command = String(payload?.tool_input?.command ?? "");
-  // `.env.example` est versionné et sans valeur : il ne doit pas déclencher le garde-fou.
-  const probe = command.replaceAll(".env.example", "«example»");
 
-  for (const pattern of SECRET_PATHS) {
-    if (pattern.test(probe)) {
-      deny(
-        "accès à un fichier de secrets",
-        "Les .env.local, clés et identifiants ne se lisent pas depuis un agent."
-      );
+  // Ce qui est entre guillemets ou dans un heredoc est du **texte**, pas une
+  // commande : messages de commit, `echo`, scripts passés à `node -e`. Les
+  // analyser revenait à bloquer quelqu'un qui *parle* d'une commande dangereuse
+  // au lieu de l'exécuter — constaté trois fois en audit.
+  const executable = command
+    .replace(/<<-?\s*'?(\w+)'?[\s\S]*?^\1/gm, " ")
+    .replace(/'[^']*'/g, " ")
+    .replace(/"[^"]*"/g, " ");
+
+  // Un chemin de secret n'est un problème que si une commande le **lit** ou le
+  // **copie**. Sans cette distinction, le garde-fou bloquait de la prose : un
+  // `echo`, un message de commit ou un commentaire mentionnant un nom de fichier.
+  // Trois faux positifs constatés en audit, chacun poussant au contournement —
+  // un garde-fou qu'on apprend à esquiver ne garde plus rien.
+  for (const segment of executable.split(/[|;&]+|\$\(|`/)) {
+    const probe = segment.replaceAll(".env.example", "«example»");
+
+    if (
+      !(READS_FILES.test(segment) && SECRET_PATHS.some((p) => p.test(probe)))
+    ) {
+      continue;
     }
+
+    deny(
+      "lecture ou copie d'un fichier de secrets",
+      "Clés et identifiants ne se lisent pas depuis un agent."
+    );
   }
 
   for (const { pattern, why } of DESTRUCTIVE) {
-    if (pattern.test(command)) {
+    // Le bac à sable temporaire n'est pas le dépôt : y supprimer un dossier de
+    // test est légitime, et l'interdire pousse à contourner le garde-fou.
+    if (pattern.test(executable) && !onlyTemporaryPaths(executable)) {
       deny(
         `commande destructive — ${why}`,
         `Commande : ${command.slice(0, 120)}`

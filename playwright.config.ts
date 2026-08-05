@@ -12,7 +12,9 @@ import { defineConfig, devices } from "@playwright/test";
  * lui-même. Cela suppose un `.env.local` complet ; sans clés de service, démarrer
  * l'application manuellement.
  */
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+// `||` et non `??` : une variable GitHub non définie exporte une chaîne vide,
+// que `??` ne rattrape pas — le job E2E échouait alors sur une URL invalide.
+const baseURL = process.env.E2E_BASE_URL || "http://localhost:3000";
 const startServer = process.env.E2E_START_SERVER === "true";
 
 export default defineConfig({
