@@ -14,7 +14,12 @@ export const TableOfContents = ({
 }: TableOfContentsProperties) => (
   <div>
     <RichText
-      // @ts-expect-error "idk"
+      // Le type `components` de basehub/react-rich-text est générique sur le
+      // schéma du contenu ; sans schéma généré (BASEHUB_TOKEN absent), il se
+      // résout en une forme incompatible avec ces surcharges pourtant valides
+      // à l'exécution. À réévaluer dès que `basehub` génère les types du projet.
+      // nosemgrep: local-no-ts-suppression
+      // @ts-expect-error types BaseHub non générés — voir commentaire ci-dessus
       components={{
         ol: ({ children }) => (
           <ol className="flex list-none flex-col gap-2 text-sm">{children}</ol>

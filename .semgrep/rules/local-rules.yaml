@@ -14,7 +14,7 @@ rules:
       Suppression d'erreur TypeScript. Interdite sans justification écrite
       (.claude/rules/quality.md). Corriger le type plutôt que le masquer.
     patterns:
-      - pattern-regex: "@ts-ignore|as\\s+unknown\\s+as"
+      - pattern-regex: "@ts-ignore|@ts-expect-error|as\\s+unknown\\s+as"
     paths:
       exclude:
         - "**/node_modules/**"

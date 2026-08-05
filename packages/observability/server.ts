@@ -21,12 +21,29 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
 
-    // Capture local variables in stack traces for better debugging
-    includeLocalVariables: true,
+    // Désactivé volontairement : les variables locales d'une frontière serveur
+    // contiennent corps de requête, jetons et données personnelles. Le confort
+    // de débogage ne justifie pas de les envoyer à un tiers.
+    // Voir .claude/rules/security.md et docs/SECURITY_MODEL.md.
+    includeLocalVariables: false,
 
-    // Integrations for console logging
+    // Ne pas envoyer les données de la requête (corps, en-têtes, cookies).
+    sendDefaultPii: false,
+
+    // Dernier filet : retirer le corps et les en-têtes avant envoi.
+    // Sentry complète les logs, il ne doit pas devenir un entrepôt de données.
+    beforeSend(event) {
+      if (event.request) {
+        event.request.data = undefined;
+        event.request.headers = undefined;
+        event.request.cookies = undefined;
+      }
+      return event;
+    },
+
     integrations: [
-      // Send console.log, console.error, and console.warn calls as logs to Sentry
-      Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
+      // Les logs d'erreur et d'avertissement remontent ; `log` est exclu pour
+      // ne pas transformer un journal de débogage en flux vers un tiers.
+      Sentry.consoleLoggingIntegration({ levels: ["error", "warn"] }),
     ],
   });

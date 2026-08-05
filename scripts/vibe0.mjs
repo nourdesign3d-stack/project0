@@ -46,6 +46,9 @@ const CLERK_PUBLISHABLE = /^pk_/;
 const COMMENTED_KEY = (key) => new RegExp(`^#\\s*${key}=.*$`, "m");
 const ACTIVE_KEY = (key) => new RegExp(`^${key}=.*$`, "m");
 
+// Échecs rencontrés : le script ne doit pas annoncer un succès qu'il n'a pas.
+const problems = [];
+
 const out = process.stdout;
 const say = (text = "") => out.write(`${text}\n`);
 
@@ -326,7 +329,12 @@ for (const secret of secrets) {
 // 5. Plomberie
 say("");
 if (await confirm("Installer les dépendances (pnpm install) ?", true)) {
-  run("pnpm", ["install"]);
+  try {
+    run("pnpm", ["install"]);
+  } catch {
+    say("    → installation échouée.");
+    problems.push("pnpm install a échoué");
+  }
 }
 
 if (
@@ -345,6 +353,7 @@ if (
     say("       Changer POSTGRES_PORT dans .env, puis mettre à jour");
     say("       DATABASE_URL dans les .env.local, et relancer :");
     say("       docker compose up -d");
+    problems.push("la base de données n'a pas démarré");
   }
 }
 
@@ -358,6 +367,7 @@ if (
     run("pnpm", ["verify"]);
   } catch {
     say("    → la vérification a échoué : corriger avant d'aller plus loin.");
+    problems.push("pnpm verify a échoué");
   }
 }
 
@@ -431,6 +441,22 @@ if (
 
 finished = true;
 rl.close();
+
+if (problems.length > 0) {
+  say("");
+  say("  ─────────────────────────────────────────────────────────────────");
+  say(`  ${name} est amorcé PARTIELLEMENT. Étapes en échec :`);
+  say("");
+  for (const problem of problems) {
+    say(`    ✗ ${problem}`);
+  }
+  say("");
+  say("  Corriger avant de continuer : un projet qui ne vérifie pas ne se");
+  say("  développe pas. Reprendre avec : pnpm verify");
+  say("  ─────────────────────────────────────────────────────────────────");
+  say("");
+  process.exit(1);
+}
 
 say(`
   ─────────────────────────────────────────────────────────────────

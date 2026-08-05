@@ -46,11 +46,20 @@ try {
     git("config", "core.hooksPath", ".githooks");
     process.stdout.write("  hooks Git activés (.githooks)\n");
   }
+
+  // Contrôle final : ne jamais laisser croire que `main` est protégé si le
+  // réglage n'a pas pris (verrou Git, permissions, configuration système).
+  if (git("config", "--get", "core.hooksPath") !== ".githooks") {
+    throw new Error("core.hooksPath n'a pas été appliqué");
+  }
 } catch (error) {
-  // Un échec ici ne doit jamais casser une installation.
+  // Dans un dépôt Git, un échec est un vrai problème : il faut le voir.
   process.stderr.write(
-    `  hooks Git non activés : ${error instanceof Error ? error.message : String(error)}\n`
+    `\n  ✗ hooks Git non activés : ${error instanceof Error ? error.message : String(error)}\n` +
+      "    `main` n'est PAS protégé sur ce poste.\n" +
+      "    Corriger puis relancer : pnpm hooks:install\n\n"
   );
+  process.exit(1);
 }
 
 process.exit(0);

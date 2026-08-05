@@ -59,7 +59,11 @@ apps/                       packages/
 ## Flux principaux
 
 1. **Authentification** — Clerk gère sessions et organisations. `apps/app/proxy.ts`
-   protège les routes ; l'autorisation fine reste à la charge de chaque action serveur.
+   **initialise Clerk et pose les en-têtes de sécurité ; il n'appelle pas `auth.protect()`
+   et ne protège donc aucune route.** La redirection observée vient du layout
+   `app/(authenticated)/layout.tsx`. Toute route ajoutée hors de ce layout — API,
+   route handler, action serveur — est publique tant qu'elle ne vérifie pas
+   l'authentification elle-même.
 2. **Données** — Prisma Client (généré) → adaptateur Neon → Postgres. Accès serveur uniquement.
 3. **Webhooks entrants** — Clerk et Stripe → `apps/api/app/webhooks/*` → vérification de
    signature → traitement.

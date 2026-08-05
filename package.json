@@ -21,7 +21,7 @@
     "e2e:install": "playwright install --with-deps chromium",
     "semgrep": "semgrep scan --config p/typescript --config p/react --config p/secrets --config p/owasp-top-ten --config .semgrep/rules --error",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build --filter=app... --filter=api...",
-    "graph": "depcruise apps packages --output-type mermaid --output-to docs/graph/dependencies.mmd && depcruise apps packages --output-type err-long",
+    "graph": "mkdir -p docs/graph && depcruise apps packages --output-type mermaid --output-to docs/graph/dependencies.mmd && depcruise apps packages --output-type err-long",
     "bump-deps": "pnpm dlx npm-check-updates --deep -u && pnpm install",
     "bump-ui": "pnpm dlx shadcn@latest add --all --overwrite -c packages/design-system",
     "migrate": "cd packages/database && pnpm exec prisma format && pnpm exec prisma generate && pnpm exec prisma migrate dev",

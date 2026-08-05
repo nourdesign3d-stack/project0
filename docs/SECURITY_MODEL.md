@@ -47,7 +47,7 @@ seule protection est la vérification de signature.
 | Contrôle | Implémentation | Statut |
 | --- | --- | --- |
 | Authentification | Clerk (`packages/auth`) | actif, non configuré (clés absentes) |
-| Protection de routes | `apps/app/proxy.ts` | actif |
+| Protection de routes | aucune au niveau proxy — `apps/app/proxy.ts` n'appelle pas `auth.protect()` ; seule la redirection du layout authentifié protège les pages | **à traiter** |
 | En-têtes de sécurité | Nosecone (`packages/security`) | actif |
 | Bot / WAF | Arcjet (`packages/security`) | câblé, clé absente |
 | Limitation de débit | Upstash (`packages/rate-limit`) | câblé, clé absente |

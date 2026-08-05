@@ -162,9 +162,10 @@ export const POST = async (request: Request): Promise<Response> => {
     });
   }
 
-  // Get the body
-  const payload = (await request.json()) as object;
-  const body = JSON.stringify(payload);
+  // Corps brut : la signature Svix porte sur les octets reçus. Passer par
+  // request.json() puis JSON.stringify() re-sérialise le corps et peut faire
+  // échouer une signature pourtant valide (ordre des clés, espaces, unicode).
+  const body = await request.text();
 
   // Create a new SVIX instance with your secret.
   const webhook = new Webhook(env.CLERK_WEBHOOK_SECRET);
@@ -189,7 +190,10 @@ export const POST = async (request: Request): Promise<Response> => {
   const { id } = event.data;
   const eventType = event.type;
 
-  log.info("Webhook", { id, eventType, body });
+  // Ne jamais journaliser le corps : il contient e-mail, nom, téléphone et
+  // l'ensemble des attributs de l'utilisateur. En production, `log` écrit vers
+  // un service tiers (BetterStack). Voir .claude/rules/security.md.
+  log.info("Webhook", { id, eventType });
 
   let response: Response = new Response("", { status: 201 });
 

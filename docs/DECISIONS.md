@@ -101,7 +101,9 @@ transitifs).
 le paquet npm `graphify` est un générateur de graphes aléatoires sans rapport, et
 `code-review-graph` n'existe pas au registre. Aucun outil officiel identifiable.
 **Décision** : ne pas installer d'outil non vérifiable. Utiliser **dependency-cruiser**
-via `pnpm dlx` (aucune dépendance ajoutée au dépôt), configuré par `.dependency-cruiser.cjs`,
+installé en dépendance de développement (l'exécution via `pnpm dlx` a été abandonnée :
+isolée du dépôt, elle ne voyait pas TypeScript et ne cruisait que 9 modules sur 320),
+configuré par `.dependency-cruiser.cjs`,
 sortie Mermaid dans `docs/graph/`. `pnpm boundaries` (Turborepo) reste le contrôle rapide.
 **Conséquences** : `pnpm graph` est reproductible et documenté. Si un outil « Graphify »
 officiel est identifié plus tard, cette décision est à revoir — on ne conservera qu'un

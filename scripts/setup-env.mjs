@@ -18,7 +18,13 @@
  * contiennent des clés de service réelles.
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,7 +97,9 @@ for (const workspace of workspaces) {
     )
     .join("\n");
 
-  writeFileSync(target, content);
+  // 0600 : ces fichiers reçoivent des clés de service dès le premier usage.
+  writeFileSync(target, content, { mode: 0o600 });
+  chmodSync(target, 0o600);
   created.push(workspace);
 }
 

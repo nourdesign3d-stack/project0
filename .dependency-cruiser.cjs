@@ -2,7 +2,9 @@
 /**
  * Configuration dependency-cruiser — carte du dépôt et contrôle des frontières.
  *
- * Exécution : `pnpm graph` (via `pnpm dlx`, aucune dépendance ajoutée au dépôt).
+ * Exécution : `pnpm graph`. dependency-cruiser est une dépendance de développement :
+ * exécuté via `pnpm dlx`, il ne voyait pas le TypeScript du dépôt et ne cruisait
+ * que 9 modules sur 320.
  * Le graphe est une aide à la compréhension, pas une vérité : toute décision
  * importante se confirme dans le code réel.
  */
