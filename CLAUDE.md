@@ -51,6 +51,8 @@ résultat de test, de build ou de scan.
 | Migration (dev) | `pnpm migrate` |
 | Migration (déploiement) | `pnpm migrate:deploy` |
 | État des migrations | `pnpm migrate:status` |
+| Sauvegarder la base | `pnpm db:backup` |
+| Restaurer une sauvegarde | `pnpm db:restore <fichier> --to <local\|database-url> --yes` |
 
 Ports : `app` 3000, `web` 3001, `api` 3002, `email` 3003, `docs` 3004, `studio` 3005,
 `storybook` 6006.

@@ -31,6 +31,8 @@
     "migrate:deploy": "cd packages/database && pnpm exec prisma generate && pnpm exec prisma migrate deploy",
     "migrate:status": "cd packages/database && pnpm exec prisma migrate status",
     "db:push": "cd packages/database && pnpm exec prisma format && pnpm exec prisma generate && pnpm exec prisma db push",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:restore": "node scripts/db-restore.mjs",
     "clean": "git clean -xdf node_modules",
     "hooks:install": "node scripts/install-hooks.mjs",
     "env:set": "node scripts/set-env.mjs",

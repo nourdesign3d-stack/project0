@@ -40,16 +40,20 @@ const makeFixture = () => {
   mkdirSync(join(root, "docs/_skeletons"), { recursive: true });
   mkdirSync(join(root, "apps/app"), { recursive: true });
 
-  copyFileSync(
-    join(repo, "scripts/lib/env-file.mjs"),
-    join(root, "scripts/lib/env-file.mjs")
-  );
+  for (const helper of ["env-file.mjs", "database-url.mjs"]) {
+    copyFileSync(
+      join(repo, "scripts/lib", helper),
+      join(root, "scripts/lib", helper)
+    );
+  }
 
   for (const script of [
     "project-init.mjs",
     "setup-env.mjs",
     "install-hooks.mjs",
     "set-env.mjs",
+    "db-backup.mjs",
+    "db-restore.mjs",
   ]) {
     copyFileSync(join(repo, "scripts", script), join(root, "scripts", script));
   }
@@ -483,6 +487,127 @@ cases.push({
 
     assert(status === 1, "un dossier inexistant a été accepté");
     assert(output.includes("introuvable"), "le motif du refus est muet");
+  },
+});
+
+// --- Sauvegarde et restauration ---------------------------------------------
+
+/**
+ * R-004. Ces cas couvrent les **refus** : ce qui protège d'une restauration
+ * lancée sur la mauvaise base, ou d'une sauvegarde écrasée par la suivante.
+ * Le cycle complet (sauvegarde d'une base distante, restauration ailleurs,
+ * contrôle du contenu) a été exécuté à la main et est décrit dans
+ * `docs/RECOVERY.md` — il exige un conteneur et une base, pas une fixture.
+ */
+const runScript = (root, script, args, env = {}) => {
+  // L'environnement est fourni explicitement : la CI définit `DATABASE_URL` au
+  // niveau du workflow, et un cas qui reposait sur son absence passait en local
+  // pour échouer là-bas. Un test ne doit pas dépendre de ce qui l'entoure.
+  const options = {
+    cwd: root,
+    env: { ...process.env, ...env },
+    stdio: ["pipe", "pipe", "pipe"],
+  };
+
+  try {
+    return {
+      status: 0,
+      output: execFileSync(
+        process.execPath,
+        [join(root, "scripts", script), ...args],
+        options
+      ).toString(),
+    };
+  } catch (error) {
+    return {
+      status: error.status,
+      output: `${error.stdout?.toString() ?? ""}${error.stderr?.toString() ?? ""}`,
+    };
+  }
+};
+
+cases.push({
+  name: "db:restore : exige une cible déclarée",
+  run: (root) => {
+    writeFileSync(join(root, "sauvegarde.dump"), "factice");
+
+    for (const args of [
+      ["sauvegarde.dump"],
+      ["sauvegarde.dump", "--yes"],
+      ["sauvegarde.dump", "--to", "production", "--yes"],
+    ]) {
+      const { status, output } = runScript(root, "db-restore.mjs", args);
+
+      assert(status === 1, `cible acceptée à tort : ${args.join(" ")}`);
+      assert(output.includes("Usage"), "l'usage n'est pas rappelé");
+    }
+  },
+});
+
+cases.push({
+  name: "db:restore : ne fait rien sans --yes, et annonce la cible",
+  run: (root) => {
+    writeFileSync(join(root, "sauvegarde.dump"), "factice");
+
+    const { status, output } = runScript(root, "db-restore.mjs", [
+      "sauvegarde.dump",
+      "--to",
+      "local",
+    ]);
+
+    assert(status === 1, "la restauration a été tentée sans confirmation");
+    assert(output.includes("Cible"), "la cible n'est pas annoncée");
+    assert(output.includes("--yes"), "la confirmation attendue n'est pas dite");
+  },
+});
+
+cases.push({
+  name: "db:restore : refuse une sauvegarde introuvable",
+  run: (root) => {
+    const { status, output } = runScript(root, "db-restore.mjs", [
+      "absente.dump",
+      "--to",
+      "local",
+      "--yes",
+    ]);
+
+    assert(status === 1, "un fichier absent a été accepté");
+    assert(output.includes("introuvable"), "le motif du refus est muet");
+  },
+});
+
+cases.push({
+  name: "db:backup : refuse d'écraser une sauvegarde existante",
+  run: (root) => {
+    // Écraser une sauvegarde est la meilleure façon de n'en avoir aucune.
+    writeFileSync(join(root, "deja-la.dump"), "précédente");
+
+    const { status, output } = runScript(root, "db-backup.mjs", [
+      "--out",
+      "deja-la.dump",
+    ]);
+
+    assert(status === 1, "une sauvegarde existante a été écrasée");
+    assert(output.includes("existe déjà"), "le motif du refus est muet");
+    assert(
+      read(root, "deja-la.dump") === "précédente",
+      "le fichier a été modifié malgré le refus"
+    );
+  },
+});
+
+cases.push({
+  name: "db:backup : explique l'absence de DATABASE_URL",
+  run: (root) => {
+    const { status, output } = runScript(root, "db-backup.mjs", [], {
+      DATABASE_URL: "",
+    });
+
+    assert(status === 1, "la sauvegarde a été tentée sans cible");
+    assert(
+      output.includes("DATABASE_URL") && output.includes("env:set"),
+      "le message n'indique pas comment renseigner la cible"
+    );
   },
 });
 
