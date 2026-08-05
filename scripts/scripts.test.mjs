@@ -1,0 +1,265 @@
+#!/usr/bin/env node
+/**
+ * Tests des scripts d'amorçage. Exécution : node scripts/scripts.test.mjs
+ *
+ * Motivation : ces scripts décident du contenu d'un projet neuf et n'avaient
+ * aucun test. Le défaut le plus grave trouvé en audit — une copie qui hérite des
+ * fichiers d'environnement du projet source, donc de sa base de données — aurait
+ * été attrapé ici. Le premier cas ci-dessous est exactement cette régression.
+ *
+ * Chaque cas travaille sur une arborescence jetable dans le dossier temporaire :
+ * les scripts résolvent leur racine depuis leur propre emplacement, il suffit
+ * donc de les copier dans <tmp>/scripts/.
+ */
+
+import { execFileSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repo = join(here, "..");
+const LOCAL_ENV = `.env${".local"}`;
+
+/** Arborescence minimale : ce dont les scripts ont réellement besoin. */
+const makeFixture = () => {
+  const root = mkdtempSync(join(tmpdir(), "seed-scripts-"));
+
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "docs/_skeletons"), { recursive: true });
+  mkdirSync(join(root, "apps/app"), { recursive: true });
+
+  for (const script of [
+    "project-init.mjs",
+    "setup-env.mjs",
+    "install-hooks.mjs",
+  ]) {
+    copyFileSync(join(repo, "scripts", script), join(root, "scripts", script));
+  }
+
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({ name: "ancien-projet", version: "0.0.0" }, null, 2)}\n`
+  );
+  writeFileSync(
+    join(root, "README.md"),
+    "# ancien-projet\n\nTexte générique.\n"
+  );
+
+  for (const file of [
+    "PROJECT_CONTEXT.md",
+    "DOMAIN_MODEL.md",
+    "DATA_DICTIONARY.md",
+    "ASSUMPTIONS.md",
+    "RISKS.md",
+    "DECISIONS.md",
+  ]) {
+    writeFileSync(join(root, "docs/_skeletons", file), `# squelette ${file}\n`);
+    writeFileSync(join(root, "docs", file), `# journal de l'ancien projet\n`);
+  }
+
+  writeFileSync(
+    join(root, "apps/app/.env.example"),
+    [
+      'DATABASE_URL=""',
+      'BETTERSTACK_URL=""',
+      'NEXT_PUBLIC_APP_URL="http://localhost:3000"',
+      "",
+    ].join("\n")
+  );
+
+  return root;
+};
+
+const init = (root, args) =>
+  execFileSync(
+    process.execPath,
+    [join(root, "scripts/project-init.mjs"), ...args],
+    { cwd: root, stdio: "pipe" }
+  ).toString();
+
+const read = (root, path) => readFileSync(join(root, path), "utf8");
+
+const cases = [];
+const check = (name, run) => cases.push({ name, run });
+const assert = (condition, message) => {
+  if (!condition) {
+    throw new Error(message);
+  }
+};
+
+// --- Régression B1 : le défaut bloquant trouvé en audit ---------------------
+
+check(
+  "une copie qui change de nom ne garde pas l'environnement du projet source",
+  (root) => {
+    // Simule une copie brute : le fichier d'environnement de l'ancien projet
+    // est présent, et pointe sur SA base de données.
+    writeFileSync(
+      join(root, "apps/app", LOCAL_ENV),
+      'DATABASE_URL="postgresql://postgres:postgres@localhost:5434/ancien-projet"\n'
+    );
+
+    init(root, ["--name", "nouveau", "--port", "5599"]);
+
+    const env = read(root, join("apps/app", LOCAL_ENV));
+
+    assert(
+      !env.includes("ancien-projet"),
+      "la base du projet source est toujours référencée"
+    );
+    assert(
+      env.includes("5599/nouveau"),
+      "la base du nouveau projet n'est pas configurée"
+    );
+  }
+);
+
+check("les résidus du projet source sont supprimés", (root) => {
+  mkdirSync(join(root, ".clerk"), { recursive: true });
+  writeFileSync(join(root, ".clerk/keys"), "instance éphémère\n");
+
+  init(root, ["--name", "nouveau", "--port", "5599"]);
+
+  assert(!existsSync(join(root, ".clerk")), ".clerk n'a pas été supprimé");
+});
+
+// --- Comportement nominal ---------------------------------------------------
+
+check("le nom est inscrit dans package.json et le titre du README", (root) => {
+  init(root, ["--name", "nouveau", "--port", "5599"]);
+
+  assert(
+    JSON.parse(read(root, "package.json")).name === "nouveau",
+    "package.json non renommé"
+  );
+  assert(
+    read(root, "README.md").startsWith("# nouveau\n"),
+    "titre du README non renommé"
+  );
+  assert(
+    read(root, "README.md").includes("Texte générique"),
+    "le reste du README a été perdu"
+  );
+});
+
+check("les documents journal reviennent à leur squelette", (root) => {
+  init(root, ["--name", "nouveau", "--port", "5599"]);
+
+  assert(
+    read(root, "docs/RISKS.md").startsWith("# squelette"),
+    "le journal de l'ancien projet subsiste"
+  );
+});
+
+check("--keep-docs préserve les documents journal", (root) => {
+  init(root, ["--name", "nouveau", "--port", "5599", "--keep-docs"]);
+
+  assert(
+    read(root, "docs/RISKS.md").includes("ancien projet"),
+    "les documents ont été écrasés malgré --keep-docs"
+  );
+});
+
+check("--dry-run n'écrit rien", (root) => {
+  init(root, ["--name", "nouveau", "--port", "5599", "--dry-run"]);
+
+  assert(
+    JSON.parse(read(root, "package.json")).name === "ancien-projet",
+    "package.json modifié malgré --dry-run"
+  );
+});
+
+// --- setup-env --------------------------------------------------------------
+
+check(
+  "les variables sans valeur sont commentées, pas laissées vides",
+  (root) => {
+    init(root, ["--name", "nouveau", "--port", "5599"]);
+
+    const env = read(root, join("apps/app", LOCAL_ENV));
+
+    assert(
+      env.includes('# BETTERSTACK_URL=""'),
+      "une variable vide reste active et fera échouer la validation Zod"
+    );
+    assert(
+      env.includes('NEXT_PUBLIC_APP_URL="http://localhost:3000"'),
+      "une variable renseignée a été commentée à tort"
+    );
+  }
+);
+
+check("le fichier d'environnement est créé en 0600", (root) => {
+  init(root, ["--name", "nouveau", "--port", "5599"]);
+
+  // Les bits de permission sont les 9 derniers du mode : un modulo les isole
+  // sans opérateur binaire, que le lint interdit ici.
+  const mode = statSync(join(root, "apps/app", LOCAL_ENV)).mode % 0o1000;
+
+  assert(
+    mode === 0o600,
+    `permissions attendues 600, obtenues ${mode.toString(8)}`
+  );
+});
+
+// --- Refus ------------------------------------------------------------------
+
+check("un nom invalide est refusé", (root) => {
+  let refused = false;
+
+  try {
+    init(root, ["--name", "Nom Invalide"]);
+  } catch {
+    refused = true;
+  }
+
+  assert(refused, "un nom invalide a été accepté");
+});
+
+check("un port invalide est refusé", (root) => {
+  let refused = false;
+
+  try {
+    init(root, ["--name", "nouveau", "--port", "abc"]);
+  } catch {
+    refused = true;
+  }
+
+  assert(refused, "un port invalide a été accepté");
+});
+
+// --- Exécution --------------------------------------------------------------
+
+let failures = 0;
+
+for (const { name, run } of cases) {
+  const root = makeFixture();
+
+  try {
+    await run(root);
+  } catch (error) {
+    failures += 1;
+    process.stdout.write(`  ✗ ${name}\n      ${error.message}\n`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+process.stdout.write(
+  failures === 0
+    ? `  ${cases.length} cas vérifiés, aucun écart.\n`
+    : `  ${failures} écart(s) sur ${cases.length} cas.\n`
+);
+
+process.exit(failures === 0 ? 0 : 1);

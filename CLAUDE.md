@@ -37,6 +37,8 @@ résultat de test, de build ou de scan.
 | Tests E2E Playwright | `pnpm e2e` (navigateurs : `pnpm e2e:install`) |
 | Analyse de sécurité | `pnpm semgrep` |
 | Chaîne complète locale | `pnpm verify` |
+| Tests du garde-fou Bash | `pnpm test:hooks` |
+| Tests des scripts d'amorçage | `pnpm test:scripts` |
 | Frontières Turborepo | `pnpm boundaries` |
 | Graphe de dépendances | `pnpm graph` |
 | Postgres local | `docker compose up -d` |
@@ -81,6 +83,12 @@ Ports : `app` 3000, `web` 3001, `api` 3002, `email` 3003, `docs` 3004, `studio` 
 - `/release-readiness` — vérification avant livraison.
 - `/vibe` — audit du respect des principes du projet (commande `.claude/commands/vibe.md`).
 - `/next-forge` — référence du template (fournie par next-forge).
+
+## Contribution
+
+Tout changement passe par une branche et une pull request ; `main` ne reçoit que du code
+dont la CI est verte. Procédure dans `docs/DEPLOYMENT.md`. L'échappatoire
+`ALLOW_DIRECT_PUSH_MAIN=1` est réservée à la création initiale d'un dépôt.
 
 ## Interdits permanents
 

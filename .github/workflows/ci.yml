@@ -56,6 +56,9 @@ jobs:
       - name: Tests du garde-fou Bash
         run: pnpm test:hooks
 
+      - name: Tests des scripts d'amorçage
+        run: pnpm test:scripts
+
       - name: Frontières entre workspaces
         run: pnpm boundaries
 
