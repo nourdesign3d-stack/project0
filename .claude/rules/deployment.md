@@ -10,12 +10,13 @@ globs: [".github/**", "compose.yaml", "apps/*/vercel.json", "**/*.env.example"]
 Chaîne exécutée sur `push` et `pull_request` :
 
 ```
-setup (pnpm + cache) → prisma generate → lint → typecheck → test → build (app, api) → semgrep
+setup (pnpm + cache) → prisma generate → lint → typecheck → test
+  → test:hooks → test:scripts → test:launcher → boundaries → build (app, api) → semgrep
 ```
 
 - Les jobs utilisent `pnpm install --frozen-lockfile` : le lockfile fait foi.
 - Permissions GitHub Actions minimales (`contents: read` par défaut).
-- Actions tierces épinglées à un tag de version majeure maintenue.
+- Actions tierces épinglées au **SHA de commit**, version en commentaire (D-009).
 - **Aucun `|| true`**, aucune étape masquant un échec. Une étape non bloquante doit être
   nommée `(informatif)` et justifiée dans ce fichier.
 - Le job E2E Playwright et le build complet (`apps/web`, `@repo/cms`) dépendent de secrets

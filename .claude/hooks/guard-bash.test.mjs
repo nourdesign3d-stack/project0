@@ -60,6 +60,21 @@ const cases = [
   ["env", "refusé"],
   ["printenv", "refusé"],
 
+  // Contournements relevés par l'audit externe du 2026-08-05.
+  // Le correctif des faux positifs effaçait le **contenu** des guillemets avant
+  // analyse : une simple paire de guillemets rendait alors le garde-fou aveugle.
+  // Ces dix cas passaient tous ; ils gardent désormais la correction.
+  ['cat "apps/app/.env.local"', "refusé"],
+  ["cat 'apps/app/.env.local'", "refusé"],
+  ["sh -c 'cat apps/app/.env.local'", "refusé"],
+  ["bash -c 'rm -rf /Users/vibesspace/Project0/docs'", "refusé"],
+  ["rm -rf /tmp/../Users/vibesspace/Project0/docs", "refusé"],
+  ["F=apps/app/.env.local; cat $F", "refusé"],
+  ["tr a b < apps/app/.env.local", "refusé"],
+  ["node -e \"require('fs').readFileSync('.env.local')\"", "refusé"],
+  ["diff a.txt apps/app/.env.local", "refusé"],
+  ["tee apps/app/.env.local", "refusé"],
+
   // Faux positifs constatés en audit : le garde-fou bloquait de la prose et le
   // bac à sable temporaire, ce qui poussait à le contourner.
   ['echo "ne jamais lire .env.local"', "autorisé"],

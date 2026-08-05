@@ -59,8 +59,11 @@ Tester les deux chemins : succès **et** refus (401/403/404 selon le cas).
 
 ## Abus et ressources
 
-- `packages/security` (Arcjet + Nosecone) fournit protection de bot, WAF et en-têtes de
-  sécurité ; `packages/rate-limit` fournit la limitation de débit.
+- ⚠️ **Aucune protection contre les bots, aucun pare-feu applicatif.** Arcjet a été retiré
+  (D-014). `packages/security` ne fournit plus que les en-têtes de sécurité (Nosecone), et
+  `packages/rate-limit` reste inactif faute de clé Upstash.
+  Conséquence directe : **chaque route publique ou coûteuse doit se borner elle-même**.
+  Personne ne le fera à sa place. Voir R-003.
 - Protéger explicitement les routes coûteuses : IA, upload, export, recherche, envoi d'e-mail,
   endpoints publics non authentifiés.
 - Borner taille de payload, durée d'exécution, nombre de tentatives et fréquence.

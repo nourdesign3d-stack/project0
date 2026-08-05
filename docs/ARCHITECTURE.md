@@ -25,7 +25,7 @@ apps/                       packages/
 | --- | --- | --- |
 | `apps/app` | Application authentifiée : sign-in/up, recherche, collaboration, webhooks internes | auth, database, collaboration, design-system, feature-flags, notifications, observability, security, seo, webhooks, analytics |
 | `apps/web` | Site public, blog et pages légales alimentés par le CMS | cms, design-system, seo, internationalization, observability, security |
-| `apps/api` | Webhooks entrants (Clerk, Stripe), cron `keep-alive`, `/health` | auth, database, payments, webhooks, observability, security, rate-limit |
+| `apps/api` | Webhooks entrants (Clerk, Stripe), cron `keep-alive`, `/health` | analytics, auth, database, email, next-config, observability, payments |
 | `apps/email` | Prévisualisation react-email des templates de `packages/email` | email |
 | `apps/docs` | Documentation Mintlify (`mintlify dev`, `mintlify broken-links`) | — |
 | `apps/studio` | Prisma Studio sur le schéma de `packages/database` | prisma |
@@ -40,7 +40,7 @@ apps/                       packages/
 | `@repo/design-system` | Composants shadcn/ui, thème, providers | client + serveur |
 | `@repo/next-config` | Config Next partagée, variables de base | build |
 | `@repo/observability` | Sentry, logs BetterStack, instrumentation | serveur + client |
-| `@repo/security` | Arcjet (bot/WAF) + Nosecone (en-têtes) | serveur |
+| `@repo/security` | Nosecone (en-têtes de sécurité) — Arcjet retiré, voir D-014 | serveur |
 | `@repo/rate-limit` | Limitation de débit Upstash | serveur |
 | `@repo/payments` | SDK Stripe (le module `ai.ts` a été retiré — voir DECISIONS D-003) | serveur |
 | `@repo/webhooks` | Svix (webhooks sortants) | serveur |
@@ -73,7 +73,7 @@ apps/                       packages/
 
 ## Dépendances externes
 
-Clerk, Neon (Postgres), Stripe, BaseHub, Resend, Knock, Liveblocks, Upstash, Arcjet,
+Clerk, Neon (Postgres), Stripe, BaseHub, Resend, Knock, Liveblocks, Upstash,
 Svix, PostHog, Sentry, BetterStack, Vercel Blob.
 
 Chacune est un point de défaillance : timeout, retry borné et comportement dégradé
