@@ -1,7 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
+import { collectRoutes, PUBLIC_ROUTES } from "./routes";
+
+const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "app");
 
 /**
  * R-013 : `apps/app/proxy.ts` ne fait que du routage. Il n'appelle pas
@@ -11,15 +14,13 @@ import { expect, test } from "vitest";
  * 2026-08-05 : une route posée hors du groupe `(authenticated)` répondait 200 à
  * un appel anonyme, `userId: null`.
  *
- * L'autorisation se vérifie donc au plus près de la donnée
- * (`.claude/rules/security.md`). Reste à rendre l'oubli **détectable** : c'est
- * l'objet de ce test. Il échoue dès qu'une route est ajoutée sans contrôle et
- * sans être déclarée publique — le contraire d'un test qui rassure.
+ * Ce test est le **plancher** : il constate qu'un contrôle existe, sans serveur,
+ * et tourne donc toujours. Il ne peut pas juger si le contrôle refuse
+ * réellement — un `auth()` dont on ignore le résultat le satisfait. C'est
+ * l'objet de `e2e/tests/route-protection.spec.ts`, qui interroge l'application
+ * en marche.
  */
 
-const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "app");
-
-const ROUTE_FILES = new Set(["page.tsx", "route.ts"]);
 const LAYOUT_FILE = "layout.tsx";
 
 /**
@@ -28,34 +29,6 @@ const LAYOUT_FILE = "layout.tsx";
  * prétendre exhaustif sur une liste de motifs.
  */
 const AUTHORIZATION_CHECK = /\bauth\s*\(|\bcurrentUser\s*\(|auth\.protect\s*\(/;
-
-/**
- * Routes joignables sans session. Chaque entrée est une décision de sécurité.
- *
- * - `(unauthenticated)/**` : l'authentification elle-même. Sans elle, boucle.
- * - `.well-known/vercel/flags` : découverte des feature flags, interrogée sans
- *   session par la barre d'outils Vercel et protégée par son propre secret
- *   (`FLAGS_SECRET`, vérifié dans `@repo/feature-flags/access`).
- */
-const PUBLIC_ROUTES = [
-  join("(unauthenticated)", "sign-in", "[[...sign-in]]", "page.tsx"),
-  join("(unauthenticated)", "sign-up", "[[...sign-up]]", "page.tsx"),
-  join(".well-known", "vercel", "flags", "route.ts"),
-];
-
-const collectRoutes = (directory: string): string[] => {
-  const entries = readdirSync(directory, { withFileTypes: true });
-
-  return entries.flatMap((entry) => {
-    const path = join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      return collectRoutes(path);
-    }
-
-    return ROUTE_FILES.has(entry.name) ? [path] : [];
-  });
-};
 
 const readIfPresent = (path: string): string => {
   try {
@@ -84,7 +57,7 @@ const isProtected = (routePath: string): boolean => {
   return false;
 };
 
-const routes = collectRoutes(APP_DIR).map((path) => relative(APP_DIR, path));
+const routes = collectRoutes(APP_DIR);
 
 test("toute route est protégée ou explicitement déclarée publique", () => {
   const unguarded = routes.filter(

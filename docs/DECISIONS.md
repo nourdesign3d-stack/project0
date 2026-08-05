@@ -111,6 +111,46 @@ seul outil de graphe.
 
 ---
 
+## D-024 — Protection des routes : constater le refus, pas la présence d'un contrôle
+
+**Date** : 2026-08-05
+**Contexte** : D-019 avait doté R-013 d'un test statique — toute route doit porter un
+contrôle d'autorisation ou figurer dans `PUBLIC_ROUTES`. Sa limite était écrite dès
+l'origine : il constate la **présence** d'un contrôle, pas sa **justesse**. Un `auth()`
+dont on ignore le résultat le satisfait.
+
+**Décision** : ajouter un second test qui interroge l'application **en marche**. Chaque
+route non déclarée publique reçoit une requête anonyme (`GET` et `POST`) et doit refuser —
+redirection vers l'authentification, `401`, `403`, `404`, ou `405` si le verbe n'est pas
+exposé. Le test statique est **conservé** : il est le plancher qui subsiste quand aucun
+service tiers n'est configuré et que le job e2e ne tourne pas.
+
+L'inventaire des routes et la liste des routes publiques vivent dans un module unique
+(`apps/app/__tests__/routes.ts`) : deux listes auraient divergé, et la divergence serait
+passée inaperçue.
+
+**Conséquences — la démonstration** : une sonde a été posée, appelant `auth()` puis
+ignorant son résultat.
+
+| Test | Verdict sur la sonde |
+| --- | --- |
+| statique (présence) | **passe** — le contrôle existe |
+| exécution (refus réel) | **échoue** — `/probe a répondu 200 à une requête anonyme : la route est exposée` |
+
+Sonde retirée, les cinq routes protégées refusent toutes.
+
+**Limite** : le test ne couvre que l'anonymat. L'isolation **entre organisations** — un
+membre de A n'accède pas aux données de B — reste non testée : elle exige deux comptes de
+test et un modèle de données. C'est l'invariant structurant du produit (R-001), et le
+prochain à couvrir dès qu'une entité de domaine existera.
+
+**Détail d'implémentation notable** : le module partagé ne peut pas utiliser
+`import.meta.url`, car il est chargé par deux exécuteurs (vitest depuis `apps/app`,
+Playwright depuis la racine). L'import échouait côté Playwright — qui signalait « aucun
+test trouvé » plutôt qu'une erreur d'import, un silence qui aurait pu passer pour un succès.
+
+---
+
 ## D-022 — Le webhook Stripe éprouvé contre la spécification, pas contre sa bibliothèque
 
 **Date** : 2026-08-05
