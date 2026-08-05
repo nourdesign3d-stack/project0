@@ -45,6 +45,7 @@ résultat de test, de build ou de scan.
 | Postgres local | `docker compose up -d` |
 | Hook anti-push sur `main` | `pnpm hooks:install` (automatique à l'install) |
 | Générer les `.env.local` manquants | `pnpm env:setup` |
+| Renseigner une variable en saisie masquée | `pnpm env:set <VARIABLE>` |
 | Créer un projet depuis la graine | `vibe0` (après `pnpm vibe0:install`) |
 | Réinitialiser une copie du dépôt | `pnpm project:init --name <slug> [--port <n>]` |
 | Migration (dev) | `pnpm migrate` |
