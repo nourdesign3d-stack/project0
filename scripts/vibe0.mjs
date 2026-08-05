@@ -172,13 +172,20 @@ const repoExists = (repository) => {
   }
 };
 
-const isPortFree = (port) =>
+const canBind = (host, port) =>
   new Promise((resolve) => {
     const server = createServer();
     server.once("error", () => resolve(false));
     server.once("listening", () => server.close(() => resolve(true)));
-    server.listen(port, "127.0.0.1");
+    server.listen(port, host);
   });
+
+// Un port n'est utilisable que s'il est libre sur les deux adresses : Docker
+// publie sur 0.0.0.0 par défaut, alors que d'autres projets peuvent n'occuper
+// que 127.0.0.1 (ou l'inverse). Ne sonder que la boucle locale faisait passer
+// pour libres des ports déjà pris par un conteneur voisin.
+const isPortFree = async (port) =>
+  (await canBind("127.0.0.1", port)) && (await canBind("0.0.0.0", port));
 
 const findFreePort = async (start) => {
   for (let port = start; port < start + 20; port += 1) {
@@ -331,7 +338,13 @@ if (
   try {
     run("docker", ["compose", "up", "-d"]);
   } catch {
-    say("    → Docker indisponible : démarrer la base manuellement.");
+    // Deux causes fréquentes, et rien ne permet de trancher ici :
+    // Docker éteint, ou port déjà publié par un conteneur d'un autre projet.
+    say("    → la base n'a pas démarré.");
+    say(`       Port occupé ? lsof -nP -iTCP:${port} -sTCP:LISTEN`);
+    say("       Changer POSTGRES_PORT dans .env, puis mettre à jour");
+    say("       DATABASE_URL dans les .env.local, et relancer :");
+    say("       docker compose up -d");
   }
 }
 
