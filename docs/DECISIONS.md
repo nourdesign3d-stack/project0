@@ -111,6 +111,42 @@ seul outil de graphe.
 
 ---
 
+## D-025 — Neon vérifié : le pilote standard suffit, `directUrl` n'est pas nécessaire
+
+**Date** : 2026-08-05
+**Contexte** : D-021 avait remplacé l'adaptateur serverless de Neon par le pilote Postgres
+standard, en **attendant** que Neon accepte des connexions classiques. C'était le mode
+documenté par le fournisseur, mais une attente n'est pas une mesure (R-019). Deux craintes
+étaient formulées : que le TLS ne soit pas négocié, et que les migrations échouent sur le
+point d'accès mutualisé (« pooler »).
+
+**Mesure**, sur un projet Neon gratuit et un projet jetable (D-018), via la chaîne
+**pooled** :
+
+| Contrôle | Résultat |
+| --- | --- |
+| `pnpm migrate:status` | connecté, TLS négocié |
+| `pnpm migrate:deploy` | migration appliquée **par le pooler** |
+| Requête applicative réelle (`page.findMany`) | `{ ok: true }` |
+| `/` sans session | `307 → /sign-in` |
+
+**Conséquences** : aucune des deux craintes ne se matérialise. Le `directUrl` de Prisma,
+que j'annonçais probablement nécessaire, **ne l'est pas** pour ce schéma. Ne pas l'ajouter
+par précaution : une option de configuration non justifiée par une mesure est une dette.
+
+**Limite** : seules des migrations simples ont été exercées. Le pooler est un PgBouncer en
+mode transaction ; une migration prenant un verrou consultatif peut encore échouer. Si cela
+arrive, `directUrl` est la réponse — documentée ici pour ne pas la redécouvrir.
+
+**Effet de bord relevé en préparation, devenu R-021** : `pg-connection-string` 2.14 traite
+`sslmode=require` comme `verify-full`, donc **vérifie** le certificat. Le paquet annonce
+qu'en `pg` 9 ce mode adoptera la sémantique libpq — chiffrer sans vérifier. La même chaîne
+de connexion deviendra alors moins sûre, sans qu'aucune ligne de code ne change et sans
+qu'aucun test n'échoue. C'est le genre de régression qu'une montée de version silencieuse
+apporte ; le contrôle est à poser sur la PR Dependabot, pas dans le code.
+
+---
+
 ## D-024 — Protection des routes : constater le refus, pas la présence d'un contrôle
 
 **Date** : 2026-08-05
