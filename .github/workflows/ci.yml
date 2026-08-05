@@ -155,6 +155,16 @@ jobs:
         env:
           # Aucune URL de préversion n'est fournie : Playwright démarre l'app.
           E2E_START_SERVER: "true"
+          # Ces quatre-là ne sont pas des secrets, mais leur absence change le
+          # comportement : sans elles, Clerk renvoie vers son portail hébergé
+          # (`*.accounts.dev`) au lieu des pages `/sign-in` et `/sign-up` de
+          # l'application. La CI testait donc une application autrement
+          # configurée que le poste de développement, où `.env.local` les
+          # fournit. Valeurs alignées sur `apps/app/.env.example`.
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           # Sans ces secrets, le parcours authentifié reste sauté — le job

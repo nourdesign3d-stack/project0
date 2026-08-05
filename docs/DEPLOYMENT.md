@@ -39,6 +39,18 @@ préversion n'est donc nécessaire.
 Un compte de test dont l'adresse se termine par `+clerk_test@example.com` évite tout envoi
 d'e-mail réel et accepte un code de vérification fixe, documenté par Clerk.
 
+⚠️ **Ce que la CI ne lit pas.** Aucun `.env.local` n'existe sur un runner : tout ce qui
+n'est pas passé explicitement au job est absent. Les quatre `NEXT_PUBLIC_CLERK_*_URL` ne
+sont pas des secrets, mais leur absence **change le comportement de l'application** — sans
+elles, Clerk redirige vers son portail hébergé (`*.accounts.dev`) au lieu des pages
+`/sign-in` et `/sign-up` du dépôt. La première exécution réelle du job l'a montré : la CI
+testait une application autrement configurée que le poste de développement. Elles sont
+désormais fournies par le job, alignées sur `apps/app/.env.example`.
+
+La leçon vaut au-delà de Clerk : toute variable qui influence le comportement, et pas
+seulement le démarrage, doit être fournie au job — sinon on teste autre chose que ce qu'on
+livre.
+
 ## Protection de `main`
 
 ⚠️ **Aucune protection côté serveur.** Le dépôt est privé sur un plan GitHub gratuit :

@@ -10,7 +10,10 @@ globs: ["packages/database/**"]
 - Prisma 7 (`packages/database`), provider `postgresql`, `relationMode = "prisma"`.
 - Client généré dans `packages/database/generated` par `prisma generate`
   (`pnpm --filter @repo/database run build`).
-- Adaptateur Neon serverless (`@prisma/adapter-neon`) — connexion par `DATABASE_URL`.
+- Pilote Postgres standard (`@prisma/adapter-pg`) — connexion par `DATABASE_URL`, partout.
+  L'adaptateur Neon serverless a été retiré (D-021) : il parlait un protocole WebSocket
+  propre à Neon et ne pouvait interroger **aucun** Postgres ordinaire — ni celui de
+  `docker compose`, ni celui de la CI. Sur Neon, utiliser le point d'accès « pooler ».
 - Le schéma ne contient à ce jour qu'un modèle de démonstration `Page`.
   Le vrai modèle métier reste à définir (`docs/DOMAIN_MODEL.md`).
 

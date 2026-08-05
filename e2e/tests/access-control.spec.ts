@@ -97,7 +97,11 @@ test.describe("parcours authentifié", () => {
         );
       }
 
-      await codeField.fill(otp);
+      // Saisie caractère par caractère : le champ de Clerk est segmenté et
+      // réagit à chaque frappe. `fill()` le remplissait parfois sans que le
+      // fournisseur enregistre la valeur — le formulaire repartait alors avec
+      // « Enter code. », de façon intermittente (constaté en CI le 2026-08-05).
+      await codeField.pressSequentially(otp, { delay: 50 });
       // Clerk valide souvent dès la saisie complète ; le bouton peut avoir
       // disparu entre-temps, ce qui n'est pas un échec.
       await page
@@ -109,20 +113,21 @@ test.describe("parcours authentifié", () => {
     // Le fournisseur peut refuser (compte inexistant, mot de passe faux, code
     // invalide). Sans ce contrôle, l'échec se présente comme « l'URL n'a pas
     // changé » et la vraie cause reste dans le rapport HTML.
+    //
+    // Le contrôle ne vaut que **sur la page de connexion**. Appliqué partout, il
+    // ramassait le nom de l'application une fois la connexion réussie et faisait
+    // échouer un parcours qui avait abouti — constaté en CI le 2026-08-05.
     // Le motif vide est ignoré : Clerk monte un conteneur d'alerte inoccupé.
-    const rejections = (
-      await page
-        .getByRole("alert")
-        .or(page.locator(CLERK_ERROR))
-        .allInnerTexts()
-    )
-      .map((text) => text.trim())
-      .filter(Boolean);
+    if (AUTH_ROUTE.test(new URL(page.url()).pathname)) {
+      const rejections = (await page.locator(CLERK_ERROR).allInnerTexts())
+        .map((text) => text.trim())
+        .filter(Boolean);
 
-    if (rejections.length > 0) {
-      throw new Error(
-        `authentification refusée par le fournisseur : ${rejections.join(" — ")}`
-      );
+      if (rejections.length > 0) {
+        throw new Error(
+          `authentification refusée par le fournisseur : ${rejections.join(" — ")}`
+        );
+      }
     }
 
     await expect(page).toHaveURL(NOT_SIGN_IN_URL, { timeout: 20_000 });
@@ -135,7 +140,10 @@ test.describe("parcours authentifié", () => {
 
     expect(
       landing?.status(),
-      "la page authentifiée renvoie une erreur serveur"
+      "la page authentifiée n'est pas servie. Un 404 signale presque toujours " +
+        "un compte de test sans organisation active : l'application refuse " +
+        "l'accès aux données hors organisation, et c'est voulu — voir " +
+        "docs/QUALITY_GATES.md, « Parcours authentifié »"
     ).toBeLessThan(400);
   });
 });

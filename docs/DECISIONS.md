@@ -111,6 +111,38 @@ seul outil de graphe.
 
 ---
 
+## D-021 — Un seul pilote Postgres, partout
+
+**Date** : 2026-08-05
+**Contexte** : `packages/database` construisait son client avec `PrismaNeon`, l'adaptateur
+serverless de Neon. Cet adaptateur parle un protocole **WebSocket propre à Neon**, pas le
+protocole Postgres. Conséquence mesurée : sur la base locale de `docker compose`, `psql` et
+`prisma migrate deploy` réussissent, et le transport Neon échoue. Autrement dit, les
+migrations s'appliquaient et **aucune requête applicative ne pouvait aboutir** — ni en
+local, ni en CI.
+
+Invisible depuis l'origine : la seule page qui interroge la base est la page d'accueil
+authentifiée, qui exige une session Clerk **et** une organisation. Ces conditions n'ont été
+réunies que le 2026-08-05, en CI, où l'erreur est apparue sous la forme d'un `500` opaque.
+
+**Décision** : remplacer `PrismaNeon` par `PrismaPg`, le pilote Postgres standard, dans
+tous les environnements. Neon accepte les connexions Postgres classiques ; en environnement
+serverless, utiliser son point d'accès « pooler ».
+**Conséquences** : `@neondatabase/serverless`, `@prisma/adapter-neon`, `ws`, `@types/ws`,
+`bufferutil` et `undici` (orphelin) sont retirés ; `@prisma/adapter-pg` et `pg` ajoutés.
+Six dépendances en moins, une en plus.
+
+**Ce qui a emporté la décision** : deux chemins de code auraient laissé la production sur
+un transport que la CI n'exerce jamais. C'est exactement le piège constaté quelques heures
+plus tôt avec les variables Clerk — la CI validait une application autrement configurée que
+celle qu'on livre. Un seul chemin : ce qui est testé est ce qui tourne.
+
+**Limite** : le comportement sur Neon lui-même n'a **pas** été vérifié — aucun compte Neon
+n'existe à ce jour. Le pilote standard y est le mode de connexion documenté, mais c'est une
+attente, pas une mesure. Voir R-019.
+
+---
+
 ## D-020 — Versionner la migration initiale
 
 **Date** : 2026-08-05

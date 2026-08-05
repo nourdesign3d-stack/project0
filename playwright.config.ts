@@ -53,6 +53,12 @@ export default defineConfig({
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        // Playwright ignore la sortie standard du serveur par défaut. En CI, une
+        // erreur rendue par l'application arrivait donc sans sa cause : le
+        // journal du serveur, seul endroit où Next l'écrit, était jeté.
+        // Ne jamais journaliser de secret côté serveur — ce flux est public.
+        stdout: "pipe",
+        stderr: "pipe",
       }
     : undefined,
 });
