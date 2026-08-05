@@ -14,7 +14,8 @@ globs: ["packages/database/**"]
   L'adaptateur Neon serverless a été retiré (D-021) : il parlait un protocole WebSocket
   propre à Neon et ne pouvait interroger **aucun** Postgres ordinaire — ni celui de
   `docker compose`, ni celui de la CI. Sur Neon, utiliser le point d'accès « pooler ».
-- Le schéma ne contient à ce jour qu'un modèle de démonstration `Page`.
+- Le schéma contient un modèle de démonstration `Page`, à supprimer, et un modèle
+  d'infrastructure `WebhookEvent` (idempotence, D-023) qui ne suppose rien du produit.
   Le vrai modèle métier reste à définir (`docs/DOMAIN_MODEL.md`).
 
 ⚠️ `relationMode = "prisma"` signifie que **les clés étrangères ne sont pas appliquées par

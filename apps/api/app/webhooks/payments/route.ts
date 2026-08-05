@@ -7,6 +7,9 @@ import { stripe } from "@repo/payments";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { env } from "@/env";
+import { claimEvent, releaseEvent } from "@/lib/idempotency";
+
+const PROVIDER = "stripe";
 
 const USER_PAGE_SIZE = 100;
 // Borne explicite : au-delà, le rapprochement par balayage n'est plus tenable.
@@ -133,6 +136,26 @@ export const POST = async (request: Request): Promise<Response> => {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
+  // Réserver avant de traiter : Stripe rejoue un événement dès qu'il doute de
+  // sa livraison, et un paiement retraité a des conséquences réelles (R-012).
+  let claimed: boolean;
+
+  try {
+    claimed = await claimEvent(PROVIDER, event.id);
+  } catch (error) {
+    // Sans mémoire, l'idempotence n'est plus garantie : mieux vaut échouer et
+    // laisser Stripe réessayer que traiter à l'aveugle.
+    log.error(`webhook Stripe : réservation impossible — ${parseError(error)}`);
+
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+
+  if (!claimed) {
+    log.info(`webhook Stripe : événement déjà traité — ${event.id}`);
+
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -154,6 +177,10 @@ export const POST = async (request: Request): Promise<Response> => {
     // renvoyait l'événement entier — identité du client, montant, adresse.
     return NextResponse.json({ ok: true });
   } catch (error) {
+    // Libérer, sinon le réessai de Stripe serait pris pour un doublon et
+    // l'événement serait perdu en silence.
+    await releaseEvent(PROVIDER, event.id);
+
     log.error(
       `webhook Stripe : traitement de ${event.type} en échec — ${parseError(error)}`
     );

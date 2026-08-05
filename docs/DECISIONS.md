@@ -111,6 +111,42 @@ seul outil de graphe.
 
 ---
 
+## D-023 — Idempotence des webhooks : une contrainte de base, pas une vérification
+
+**Date** : 2026-08-05
+**Contexte** : R-012 était repoussé depuis l'origine au motif que l'idempotence « exige un
+modèle de données que la graine n'a pas encore ». **C'était une erreur d'analyse** : elle
+n'exige pas le modèle *métier*, seulement une table d'infrastructure. Le risque, lui, était
+réel — un fournisseur rejoue dès qu'il doute d'une livraison, et pour un paiement les
+conséquences le sont aussi.
+
+**Décision** : un modèle `WebhookEvent` à clé primaire composite `(provider, eventId)`.
+C'est la **contrainte de la base** qui décide : deux livraisons simultanées atteindraient
+toutes deux un `findFirst` avant que l'une n'écrive — ce serait une course, pas une
+garantie (`.claude/rules/database.md`).
+
+Ordre imposé : **réserver avant de traiter**. Réserver après laisserait une fenêtre où un
+rejeu passerait. Et **libérer si le traitement échoue** : sans cela, l'événement serait tenu
+pour traité et le réessai ignoré — une perte silencieuse, l'inverse du but recherché.
+
+**Clé retenue** : l'identifiant de **livraison**, pas celui de la ressource. Pour Stripe,
+`event.id`. Pour Clerk, l'en-tête `svix-id` : Svix conserve le même d'un réessai à l'autre,
+alors que `event.data.id` est partagé par tous les événements concernant la même ressource
+— l'utiliser confondrait une création et une mise à jour du même utilisateur.
+
+**Conséquences** : migration `20260805171114_webhook_events` (cinq lignes, relisible),
+`apps/api/lib/idempotency.ts`, les deux routes câblées, 26 tests dans `apps/api`. Une base
+injoignable renvoie `503` plutôt que de traiter sans mémoire : renoncer à l'idempotence en
+silence serait pire que refuser.
+
+Au passage, le webhook Clerk portait le même défaut que Stripe — absence de configuration
+acquittée par un `200`, donc événement perdu sans trace. Il renvoie `503`.
+
+**Limite** : rien ne purge la table. À volume réel, prévoir une rétention (les fournisseurs
+cessent de réessayer bien avant quelques jours).
+
+---
+
 ## D-022 — Le webhook Stripe éprouvé contre la spécification, pas contre sa bibliothèque
 
 **Date** : 2026-08-05
