@@ -10,6 +10,7 @@
     "test": "turbo test",
     "test:hooks": "node .claude/hooks/guard-bash.test.mjs",
     "test:scripts": "node scripts/scripts.test.mjs",
+    "test:launcher": "node bin/vibe0.test.mjs",
     "typecheck": "turbo typecheck && pnpm typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "lint": "ultracite check",
@@ -22,7 +23,7 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "semgrep": "semgrep scan --config p/typescript --config p/react --config p/secrets --config p/owasp-top-ten --config .semgrep/rules --error",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm boundaries && pnpm build --filter=app... --filter=api...",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build --filter=app... --filter=api...",
     "graph": "mkdir -p docs/graph && depcruise apps packages --output-type mermaid --output-to docs/graph/dependencies.mmd && depcruise apps packages --output-type err-long",
     "bump-deps": "pnpm dlx npm-check-updates --deep -u && pnpm install",
     "bump-ui": "pnpm dlx shadcn@latest add --all --overwrite -c packages/design-system",
@@ -34,7 +35,8 @@
     "hooks:install": "node scripts/install-hooks.mjs",
     "env:setup": "node scripts/setup-env.mjs",
     "project:init": "node scripts/project-init.mjs",
-    "vibe0": "node scripts/vibe0.mjs"
+    "vibe0": "node scripts/vibe0.mjs",
+    "vibe0:install": "node bin/install-vibe0.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
