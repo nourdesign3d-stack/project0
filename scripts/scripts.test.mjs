@@ -125,6 +125,85 @@ check(
   }
 );
 
+// --- R-017 : la copie qui garde le même nom ---------------------------------
+//
+// Le jeu de tests précédent n'exerçait que le cas renommé. Une copie vers un
+// dossier portant le nom du projet source conservait donc ses environnements,
+// et sa base de données. Relevé par l'audit du 2026-08-05.
+
+check(
+  "à nom inchangé, un environnement existant fait échouer plutôt qu'hériter",
+  (root) => {
+    writeFileSync(
+      join(root, "apps/app", LOCAL_ENV),
+      'DATABASE_URL="postgresql://postgres:postgres@localhost:5434/ancien-projet"\n'
+    );
+
+    let refused = false;
+    let message = "";
+
+    try {
+      init(root, ["--name", "ancien-projet", "--port", "5599"]);
+    } catch (error) {
+      refused = true;
+      message = (error.stderr ?? "").toString();
+    }
+
+    assert(refused, "l'environnement du projet source a été hérité en silence");
+    assert(
+      message.includes("--fresh") && message.includes("--keep-env"),
+      "le refus n'explique pas comment le lever"
+    );
+    assert(
+      read(root, join("apps/app", LOCAL_ENV)).includes("ancien-projet"),
+      "le fichier a été supprimé alors que le refus devait le préserver"
+    );
+  }
+);
+
+check("--fresh régénère l'environnement même à nom inchangé", (root) => {
+  writeFileSync(
+    join(root, "apps/app", LOCAL_ENV),
+    'DATABASE_URL="postgresql://postgres:postgres@localhost:5434/ancien-projet"\n'
+  );
+
+  init(root, ["--name", "ancien-projet", "--port", "5599", "--fresh"]);
+
+  const env = read(root, join("apps/app", LOCAL_ENV));
+
+  assert(
+    env.includes("5599/ancien-projet") && !env.includes("5434"),
+    "l'environnement n'a pas été régénéré"
+  );
+});
+
+check("--keep-env conserve l'environnement, sans échouer", (root) => {
+  writeFileSync(
+    join(root, "apps/app", LOCAL_ENV),
+    'DATABASE_URL="postgresql://postgres:postgres@localhost:5434/ancien-projet"\n'
+  );
+
+  init(root, ["--name", "ancien-projet", "--port", "5599", "--keep-env"]);
+
+  assert(
+    read(root, join("apps/app", LOCAL_ENV)).includes("5434"),
+    "l'environnement a été modifié malgré --keep-env"
+  );
+});
+
+check("les caches de build par workspace sont supprimés", (root) => {
+  for (const path of [".turbo", "apps/app/.turbo", "apps/app/.next"]) {
+    mkdirSync(join(root, path), { recursive: true });
+    writeFileSync(join(root, path, "cache"), "résidu\n");
+  }
+
+  init(root, ["--name", "nouveau", "--port", "5599"]);
+
+  for (const path of [".turbo", "apps/app/.turbo", "apps/app/.next"]) {
+    assert(!existsSync(join(root, path)), `${path} n'a pas été supprimé`);
+  }
+});
+
 check("les résidus du projet source sont supprimés", (root) => {
   mkdirSync(join(root, ".clerk"), { recursive: true });
   writeFileSync(join(root, ".clerk/keys"), "instance éphémère\n");

@@ -96,9 +96,11 @@ fichiers non versionnés — `.env.local` (clés réelles et `DATABASE_URL` du p
 `.clerk/`, et un cache `.turbo` de plusieurs gigaoctets. Le projet neuf lit et migre alors
 la base de l'ancien. `git clone --local` ne prend que ce qui est versionné.
 
-Si une copie brute a quand même eu lieu, `project:init` la rattrape : dès que le nom du
-projet change, il supprime les environnements hérités, `.clerk/` et `.turbo/`, puis
-régénère les `.env.local` à partir des `.env.example`.
+Si une copie brute a quand même eu lieu, `project:init` la rattrape : il supprime toujours
+les caches de build et l'instance Clerk héritée, à la racine **et** dans chaque workspace.
+Pour les fichiers d'environnement, qui peuvent contenir de vraies clés : un changement de
+nom prouve qu'ils appartiennent à un autre projet, ils sont régénérés ; à nom identique il
+**refuse** et propose `--fresh` (régénérer) ou `--keep-env` (conserver sciemment).
 
 `project:init` inscrit le nom, remet les **six documents « journal »** de `docs/` à leur
 squelette (`docs/_skeletons/`), écrit le `.env` de Docker Compose, génère les

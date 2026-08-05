@@ -42,15 +42,22 @@ const JOURNAL = [
   "DECISIONS.md",
 ];
 
+const FLAGS = {
+  "--dry-run": "dryRun",
+  "--keep-docs": "keepDocs",
+  // Régénère les fichiers d'environnement même si le nom ne change pas.
+  "--fresh": "fresh",
+  // Conserve les fichiers d'environnement existants, en connaissance de cause.
+  "--keep-env": "keepEnv",
+};
+
 const parseArgs = (argv) => {
-  const args = { dryRun: false, keepDocs: false };
+  const args = { dryRun: false, keepDocs: false, fresh: false, keepEnv: false };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === "--dry-run") {
-      args.dryRun = true;
-    } else if (arg === "--keep-docs") {
-      args.keepDocs = true;
+    if (FLAGS[arg]) {
+      args[FLAGS[arg]] = true;
     } else if (arg === "--name" || arg === "--port") {
       args[arg.slice(2)] = argv[i + 1];
       i += 1;
@@ -143,39 +150,80 @@ if (existsSync(graph)) {
 
 // 6. Résidus du projet source.
 //
-// Un `cp -R` transporte les fichiers non versionnés : .env.local (clés réelles et
-// DATABASE_URL du projet précédent), .clerk (instance Clerk éphémère), .turbo
-// (cache, plusieurs Go). Sans traitement, le projet neuf lit et migre la base de
-// l'ancien — constaté en audit. Un changement de nom prouve qu'on n'est plus dans
-// le projet d'origine : ses fichiers d'environnement n'ont plus rien à faire ici.
-const renamed = previousName !== name;
+// Une copie de dossier transporte les fichiers non versionnés : environnements
+// locaux (clés réelles et base de données du projet précédent), instance Clerk
+// éphémère, caches de build de plusieurs gigaoctets. Sans traitement, le projet
+// neuf lit et migre la base de l'ancien.
+//
+// Deux natures, deux traitements — distinction issue de l'audit du 2026-08-05,
+// qui a montré qu'une copie vers un dossier de **même nom** n'était pas nettoyée :
+//
+//   - caches et instances éphémères : toujours supprimés, ils se régénèrent ;
+//   - fichiers d'environnement : ils peuvent contenir de vraies clés. Un
+//     changement de nom prouve qu'ils appartiennent à un autre projet, on les
+//     régénère. À nom égal, on ne devine pas : on refuse et on explique.
 
-const inheritedEnv = ["apps", "packages"].flatMap((group) => {
+const workspaces = ["apps", "packages"].flatMap((group) => {
   const base = join(root, group);
+
   if (!existsSync(base)) {
     return [];
   }
-  return readdirSync(base)
-    .map((entry) => join(group, entry, ".env.local"))
-    .filter((path) => existsSync(join(root, path)));
+
+  return readdirSync(base).map((entry) => join(group, entry));
 });
 
-const EPHEMERAL = [".clerk", ".turbo"];
+const EPHEMERAL = [".clerk", ".turbo", ".next", ".react-email"];
 
-if (renamed && !args.dryRun) {
-  for (const path of inheritedEnv) {
-    rmSync(join(root, path), { force: true });
+const ephemeralPaths = [
+  ...EPHEMERAL,
+  // Les caches par workspace survivaient à toutes les réinitialisations.
+  ...workspaces.flatMap((workspace) =>
+    EPHEMERAL.map((entry) => join(workspace, entry))
+  ),
+].filter((path) => existsSync(join(root, path)));
+
+const inheritedEnv = workspaces
+  .map((workspace) => join(workspace, ".env.local"))
+  .filter((path) => existsSync(join(root, path)));
+
+const renamed = previousName !== name;
+const regenerateEnv = renamed || args.fresh;
+
+// Refus explicite plutôt qu'héritage silencieux ou suppression de vraies clés.
+if (
+  !(regenerateEnv || args.keepEnv || args.dryRun) &&
+  inheritedEnv.length > 0
+) {
+  fail(
+    `Le nom du projet est déjà « ${name} », et ${inheritedEnv.length} fichier(s) d'environnement existent.\n` +
+      "    Impossible de savoir s'ils appartiennent à ce projet ou à celui qui a été copié.\n\n" +
+      "      --fresh      les supprimer et les régénérer depuis les .env.example\n" +
+      "      --keep-env   les conserver tels quels, en connaissance de cause\n\n" +
+      "    Un environnement hérité fait pointer le projet neuf sur la base de données\n" +
+      "    du projet source, avec ses clés. Voir docs/RISKS.md R-017."
+  );
+}
+
+if (!args.dryRun) {
+  for (const path of ephemeralPaths) {
+    rmSync(join(root, path), { recursive: true, force: true });
   }
 
-  for (const path of EPHEMERAL) {
-    if (existsSync(join(root, path))) {
-      actions.push(`${path}/ (résidu du projet source, supprimé)`);
-      rmSync(join(root, path), { recursive: true, force: true });
+  if (regenerateEnv) {
+    for (const path of inheritedEnv) {
+      rmSync(join(root, path), { force: true });
     }
   }
 }
 
-if (renamed && inheritedEnv.length > 0) {
+if (ephemeralPaths.length > 0) {
+  actions.push(
+    `${ephemeralPaths.length} cache(s) et instance(s) éphémère(s) supprimés`
+  );
+}
+
+if (regenerateEnv && inheritedEnv.length > 0) {
   actions.push(
     `${inheritedEnv.length} fichier(s) d'environnement du projet « ${previousName} » supprimés puis régénérés`
   );
