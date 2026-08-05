@@ -14,7 +14,21 @@ packages: # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pn
 # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
 
 # Empêche une mise à jour de dépendance d'abaisser les réglages de sécurité.
+# Ce contrôle a déjà écarté quatre paquets en une semaine : @langchain/core,
+# @arcjet/next, resend et chokidar. Il est utile — mais il refuse aussi des
+# montées de version légitimes, y compris des correctifs de sécurité.
 trustPolicy: no-downgrade
+
+# Exceptions nommées et datées. Chacune doit porter sa raison, comme un
+# `nosemgrep` : une exception muette est un contournement.
+trustPolicyExclude:
+  # 2026-08-05 — chokidar bloquait la montée de react-email 5 → 6, seule voie
+  # pour retirer `next@16.1.6` de l'arbre et fermer 28 alertes réelles.
+  # Le signal est une **perte d'attestation de provenance** entre deux versions,
+  # pas une preuve de compromission : l'éditeur publie de façon irrégulière.
+  # Un contrôle qui empêche d'appliquer un correctif de sécurité protège moins
+  # qu'il ne coûte. À réexaminer si chokidar retrouve une attestation.
+  - chokidar
 
 # Interdit l'installation de dépendances transitives depuis des sources exotiques
 # (git, tarball distant) plutôt que depuis le registre.
