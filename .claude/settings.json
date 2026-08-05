@@ -65,19 +65,7 @@
       "Read(**/*.key)",
       "Read(**/id_rsa*)",
       "Read(~/.aws/**)",
-      "Read(~/.ssh/**)",
-      "Bash(rm -rf:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(git clean -xdf:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(pnpm db:push:*)",
-      "Bash(pnpm exec prisma migrate reset:*)",
-      "Bash(pnpm exec prisma db push:*)",
-      "Bash(docker compose down -v:*)",
-      "Bash(vercel:*)",
-      "Bash(env)",
-      "Bash(printenv:*)"
+      "Read(~/.ssh/**)"
     ]
   },
   "hooks": {

@@ -46,6 +46,10 @@ Une commande non exécutée ou non exécutable → **NON VÉRIFIÉ** (jamais « 
    Dependabot toujours actif sur les écosystèmes présents.
 10. **Déployabilité** — le dépôt reste compilable et déployable ; les variables requises
     sont documentées ; un chemin de retour existe.
+11. **Exceptions arrivées à échéance** — toute exception datée est-elle encore justifiée ?
+    Chercher `ÉCHÉANCE` dans `pnpm-workspace.yaml`, `nosemgrep` dans le code, les
+    `biome-ignore`, et les risques `accepté` de `docs/RISKS.md`. Une exception qu'on ne
+    réexamine jamais devient une règle silencieuse.
 
 ## C. Discipline de l'agent — relire les derniers échanges
 

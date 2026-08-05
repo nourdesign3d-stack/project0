@@ -22,7 +22,13 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,6 +97,15 @@ if (resolve(target) === resolve(seed)) {
 }
 
 if (existsSync(target)) {
+  // `lstat` et non `stat` : un lien symbolique vers un dossier vide faisait
+  // écrire le clone dans sa cible réelle, sans que rien ne le signale.
+  if (lstatSync(target).isSymbolicLink()) {
+    fail(
+      `${target} est un lien symbolique.`,
+      "vibe0 écrirait ailleurs que là où vous croyez. Viser le dossier réel."
+    );
+  }
+
   if (!statSync(target).isDirectory()) {
     fail(`${target} existe et n'est pas un dossier.`);
   }
@@ -120,6 +135,15 @@ run(
   process.cwd()
 );
 
+// Le clone hérite d'un `origin` qui pointe sur la graine : un `git push` depuis
+// le projet neuf écrirait dans le dépôt de référence. On coupe le lien ; la
+// commande pour le rétablir est rappelée en fin de parcours.
+try {
+  run("git", ["remote", "remove", "origin"], target);
+} catch {
+  // Pas de remote à retirer : rien à faire.
+}
+
 const init = join(target, "scripts/vibe0.mjs");
 
 if (!existsSync(init)) {
@@ -132,4 +156,8 @@ if (!existsSync(init)) {
 out.write("  Clone terminé. Amorçage du projet…\n");
 run(process.execPath, [init], target);
 
-out.write(`\n  Le projet est dans ${target}\n\n`);
+out.write(
+  `\n  Le projet est dans ${target}\n` +
+    "  Le remote hérité de la graine a été retiré : un push accidentel ne peut\n" +
+    `  plus atteindre ${seed}.\n\n`
+);

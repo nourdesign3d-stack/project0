@@ -15,7 +15,9 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -95,6 +97,42 @@ check("fonctionne depuis un dossier vide, sans argument", (seed, work) => {
   assert(
     existsSync(join(target, "pnpm-workspace.yaml")),
     "le clone n'a pas eu lieu dans le dossier courant"
+  );
+});
+
+check("le remote hérité de la graine est retiré", (seed, work) => {
+  const target = join(work, "sans-remote");
+  const result = launch(seed, work, [target]);
+
+  assert(result.ok, `échec inattendu : ${result.stderr}`);
+
+  const remotes = execFileSync("git", ["remote"], { cwd: target })
+    .toString()
+    .trim();
+
+  assert(
+    remotes === "",
+    `un push depuis le projet neuf viserait encore : ${remotes}`
+  );
+});
+
+check("refuse une cible qui est un lien symbolique", (seed, work) => {
+  const real = join(work, "cible-reelle");
+  const link = join(work, "raccourci");
+
+  mkdirSync(real);
+  symlinkSync(real, link);
+
+  const result = launch(seed, work, [link]);
+
+  assert(!result.ok, "le clone a suivi le lien sans le signaler");
+  assert(
+    result.stderr.includes("lien symbolique"),
+    `motif de refus inattendu : ${result.stderr}`
+  );
+  assert(
+    readdirSync(real).length === 0,
+    "le clone a écrit dans la cible réelle du lien"
   );
 });
 

@@ -72,6 +72,12 @@ Tester les deux chemins : succès **et** refus (401/403/404 selon le cas).
 
 - Minimiser la collecte, ne pas journaliser d'identifiant personnel inutile.
 - Filtrer les données sensibles avant envoi à Sentry ou à tout service d'analyse.
+- Sentry est **bridé** : ni variables locales, ni corps de requête, ni en-têtes, ni
+  cookies (`packages/observability/server.ts`). Contrepartie assumée : une erreur de
+  désérialisation ou de validation n'est plus reproductible depuis Sentry seul.
+  Compensation attendue de chaque frontière serveur : journaliser un **identifiant de
+  corrélation** et la **forme** de l'erreur (champ en cause, type attendu), jamais la
+  valeur reçue. Voir R-018.
 - Documenter toute donnée sensible dans `docs/DATA_DICTIONARY.md` et
   `docs/SECURITY_MODEL.md`.
 
