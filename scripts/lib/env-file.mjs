@@ -22,3 +22,23 @@ export const declares = (content, key) => declaration(key).test(content);
  */
 export const withValue = (content, key, value) =>
   content.replace(declaration(key), `${key}="${value}"`);
+
+/**
+ * Lit une valeur **active** (non commentée). Volontairement minimal : de quoi
+ * lire une `DATABASE_URL`, sans ajouter `dotenv` à la racine du dépôt pour cela.
+ *
+ * `dotenv` retenant la dernière définition, on fait de même.
+ */
+const SURROUNDING_QUOTES = /^(["'])(.*)\1$/;
+
+export const readValue = (content, key) => {
+  const matches = content.match(new RegExp(`^${key}\\s*=(.*)$`, "gm"));
+
+  if (!matches) {
+    return "";
+  }
+
+  const raw = matches.at(-1).split("=").slice(1).join("=").trim();
+
+  return raw.replace(SURROUNDING_QUOTES, "$2");
+};

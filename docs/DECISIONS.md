@@ -111,6 +111,52 @@ seul outil de graphe.
 
 ---
 
+## D-027 — Sauvegarde : un mécanisme répété, pas une procédure écrite
+
+**Date** : 2026-08-05
+**Contexte** : R-004 — gravité **critique** — était intact depuis l'initialisation. Sa
+formulation portait le mot décisif : « ni **testée** ». Une procédure de restauration
+jamais exécutée ne vaut rien, et c'est le seul incident dont aucun correctif ne rattrape.
+
+**Décision** : `pnpm db:backup` et `pnpm db:restore`, exécutant `pg_dump`/`pg_restore`
+**dans le conteneur** de `compose.yml`. Deux raisons : aucun client Postgres à installer sur
+chaque poste, et surtout aucun risque de client plus ancien que le serveur — `pg_dump`
+refuse alors de sauvegarder. L'URL passe par l'environnement du conteneur, jamais par une
+ligne de commande visible de tout le système.
+
+**Répétition exécutée** — restaurer **ailleurs** que sur la source, seule façon de prouver
+une sauvegarde sans mettre en jeu ce qu'elle protège :
+
+| Étape | Résultat |
+| --- | --- |
+| `db:backup` depuis **Neon** (via le pooler) | 4124 octets, permissions `600` |
+| Tables supprimées sur la base locale | `DROP TABLE` |
+| `db:restore --to local --yes` | terminée sans erreur |
+| Contrôle | tables **et** historique des migrations retrouvés |
+
+**Ce que la répétition a corrigé** : le premier essai annonçait « Restauration échouée »
+alors que tout était restauré. Un dump Neon emporte des privilèges propres à l'hébergeur
+(`GRANT ... TO neon_superuser`) qu'aucune autre base n'accepte ; `pg_restore` sort en erreur
+pour deux instructions ignorées, sur un travail par ailleurs réussi. Corrigé par
+`--no-owner --no-acl`, et le message distingue désormais échec complet et instruction
+ignorée. **Un faux négatif est ici plus dangereux qu'un vrai échec** : en incident, il pousse
+à renoncer à une restauration valide.
+
+**Garde-fous** : cible explicite (`--to local` ou `--to database-url`, jamais de défaut),
+`--yes` obligatoire après affichage de l'hôte et de la base, refus d'écraser une sauvegarde
+existante, fichiers en `600` et `sauvegardes/` hors de Git. Cinq tests couvrent ces refus.
+
+**Ce que cette décision ne règle pas** : la **politique**. Fréquence, rétention,
+emplacement, délai de reprise, responsable — aucune de ces réponses n'est générique, toutes
+dépendent de ce que le produit peut se permettre de perdre. Elles sont posées en questions
+dans `docs/RECOVERY.md` et tracées en H-008. R-004 reste donc ouvert : le mécanisme est
+éprouvé, la politique n'existe pas.
+
+**Non mesuré** : la rétention de l'historique Neon, donc la fenêtre réelle de restauration
+ponctuelle chez l'hébergeur.
+
+---
+
 ## D-026 — Sentry : filtrer les deux canaux, pas seulement les erreurs
 
 **Date** : 2026-08-05

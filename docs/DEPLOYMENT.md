@@ -223,10 +223,16 @@ Ordre de déploiement :
 
 ## Récupération
 
-À définir avant la première mise en production :
+La **procédure de restauration est écrite et a été répétée** le 2026-08-05 — sauvegarde
+d'une base Neon, restauration ailleurs, contenu et migrations contrôlés. Voir
+`docs/RECOVERY.md` (D-027) : `pnpm db:backup`, `pnpm db:restore`.
 
-- fréquence et rétention des sauvegardes de base ;
-- procédure de restauration **testée** ;
+Restent à définir avant la première mise en production :
+
+- fréquence et rétention des sauvegardes, et **où** elles sont conservées ;
+- tolérance de perte (RPO) et délai de reprise (RTO) — H-008 ;
+- fréquence de **répétition** de la restauration : une procédure non rejouée redevient
+  non testée ;
 - procédure de rollback applicatif ;
 - responsable d'astreinte.
 

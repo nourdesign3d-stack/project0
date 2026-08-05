@@ -288,3 +288,4 @@ packages/database/generated
 
 # Claude Code — préférences locales, jamais partagées
 .claude/settings.local.json
+sauvegardes/
