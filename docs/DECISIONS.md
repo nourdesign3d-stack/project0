@@ -111,6 +111,39 @@ seul outil de graphe.
 
 ---
 
+## D-022 — Le webhook Stripe éprouvé contre la spécification, pas contre sa bibliothèque
+
+**Date** : 2026-08-05
+**Contexte** : le webhook de paiement n'avait **aucun test** — relevé par l'audit du matin,
+non traité. Le motif était structurel : `@repo/payments` importe `server-only`, qui lève
+hors contexte serveur, donc le seul moyen de charger la route en test était de simuler le
+client Stripe — c'est-à-dire de simuler la vérification de signature, la seule chose qui
+mérite d'être testée.
+**Décision** : neutraliser `server-only` par un alias vitest
+(`apps/api/__tests__/stubs/server-only.ts`) pour que la route utilise le **vrai** client
+Stripe, et signer les corps de test à la main selon le schéma publié
+(`HMAC-SHA256` sur `timestamp.corps`). La route est ainsi confrontée à la spécification, et
+non à la bibliothèque qui la vérifie — signer avec le SDK aurait bouclé la bibliothèque sur
+elle-même.
+**Conséquences** — 9 tests écrits, **7 rouges** au premier passage, chacun sur un défaut réel :
+
+1. absence de configuration acquittée par un `200` : Stripe considérait l'événement traité,
+   il était perdu sans trace — désormais `503` ;
+2. signature absente, forgée ou corps modifié → `500`, donc **réessais** de Stripe pour une
+   signature qui ne deviendra jamais valide — désormais `400` ;
+3. la réponse renvoyait **l'événement entier** vers un tiers : identité du client, montant,
+   adresse — désormais `{ ok: true }` ;
+4. `getUserList` est paginé et n'était lu **que sur sa première page** : le rapprochement
+   échouait en silence au-delà (R-020).
+
+`apps/api` passe par ailleurs de `jsdom` à `node` : sous `jsdom`, `window` existe et la
+validation d'environnement refuse toute variable serveur, se croyant côté client.
+
+**Non couvert** : l'idempotence (R-012), et le comportement face à une livraison réelle de
+Stripe, qui exige un compte.
+
+---
+
 ## D-021 — Un seul pilote Postgres, partout
 
 **Date** : 2026-08-05
