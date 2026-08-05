@@ -41,8 +41,10 @@ setup (pnpm + cache) → prisma generate → lint → typecheck → test
 
 ## Observabilité
 
-- Sentry est câblé dans `packages/observability` et activé uniquement quand `VERCEL`
-  est défini (`apps/*/next.config.ts`). Sans DSN, l'application fonctionne normalement.
+- Sentry est câblé dans `packages/observability`. Seul son **plugin de build** dépend de
+  `VERCEL` ; le SDK s'initialise dès qu'un DSN existe, y compris en local (D-026). Sans DSN,
+  l'application fonctionne normalement. Le filtrage des données de requête
+  (`scrub.ts`) couvre erreurs **et** transactions — pas le canal `log` (R-022).
 - Les logs passent par `packages/observability` (BetterStack optionnel).
 - Un changement significatif doit être constatable : erreur remontée, log utile, ou
   métrique — sans donnée sensible.

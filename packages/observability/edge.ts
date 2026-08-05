@@ -7,6 +7,7 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
 import * as Sentry from "@sentry/nextjs";
 import { keys } from "./keys";
+import { scrubRequest } from "./scrub";
 
 export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
   Sentry.init({
@@ -21,9 +22,17 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
 
-    // Integrations for console logging
+    // Ce runtime exécute le proxy : il voit **toutes** les requêtes, y compris
+    // celles qui n'atteindront jamais l'application. Il n'avait aucun filtre,
+    // et sa transaction « middleware » emportait en-tête et cookie (D-026).
+    sendDefaultPii: false,
+
+    beforeSend: scrubRequest,
+    beforeSendTransaction: scrubRequest,
+
     integrations: [
-      // Send console.log, console.error, and console.warn calls as logs to Sentry
-      Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
+      // `log` est exclu : un journal de débogage n'a pas à devenir un flux vers
+      // un tiers. Même politique que le runtime serveur.
+      Sentry.consoleLoggingIntegration({ levels: ["error", "warn"] }),
     ],
   });

@@ -208,11 +208,17 @@ Ordre de déploiement :
 
 ## Observabilité
 
-- Sentry est activé uniquement lorsque la variable `VERCEL` est définie
-  (`apps/*/next.config.ts`) → pas de bruit en local. Sans DSN, l'application fonctionne.
+- ⚠️ Seul le **plugin de build** de Sentry est conditionné à `VERCEL`
+  (`apps/*/next.config.ts` : cartes de sources, route tunnel). Le **SDK**, lui, s'initialise
+  dès qu'un DSN existe (`apps/*/instrumentation.ts`), `VERCEL` ou non. Renseigner
+  `NEXT_PUBLIC_SENTRY_DSN` en local envoie donc réellement à Sentry — ce document affirmait
+  le contraire jusqu'au 2026-08-05 (D-026). Sans DSN, l'application fonctionne.
 - Séparer les environnements Sentry (dev / preview / staging / production) et associer les
   erreurs aux releases lors de la mise en place réelle.
-- Filtrer les données sensibles avant envoi (corps de requête, en-têtes, jetons).
+- Le filtrage des données de requête est appliqué par `packages/observability/scrub.ts`,
+  sur les **erreurs et les transactions**, dans les trois runtimes. Vérifié au collecteur
+  local : en-tête `authorization`, cookie, corps et chaîne d'URL ne sortent pas. Le canal
+  `log` n'est pas couvert (R-022).
 - Les logs passent par `@repo/observability` ; BetterStack est optionnel.
 
 ## Récupération

@@ -7,6 +7,7 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
 import * as Sentry from "@sentry/nextjs";
 import { keys } from "./keys";
+import { scrubRequest } from "./scrub";
 
 export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
   Sentry.init({
@@ -30,16 +31,11 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     // Ne pas envoyer les données de la requête (corps, en-têtes, cookies).
     sendDefaultPii: false,
 
-    // Dernier filet : retirer le corps et les en-têtes avant envoi.
-    // Sentry complète les logs, il ne doit pas devenir un entrepôt de données.
-    beforeSend(event) {
-      if (event.request) {
-        event.request.data = undefined;
-        event.request.headers = undefined;
-        event.request.cookies = undefined;
-      }
-      return event;
-    },
+    // Dernier filet, sur les **deux** canaux. `beforeSend` ne couvre que les
+    // erreurs : les transactions partaient avec en-têtes, cookies et corps —
+    // à chaque requête, erreur ou non. Mesuré le 2026-08-05 (D-026).
+    beforeSend: scrubRequest,
+    beforeSendTransaction: scrubRequest,
 
     integrations: [
       // Les logs d'erreur et d'avertissement remontent ; `log` est exclu pour

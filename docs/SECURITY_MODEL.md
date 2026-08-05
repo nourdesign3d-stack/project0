@@ -74,7 +74,10 @@ seule protection est la vérification de signature.
 - Plus aucune protection bot/WAF : Arcjet a été retiré. La limitation de débit reste
   inactive faute de clé. Toute route publique ou coûteuse doit se protéger elle-même.
 - Aucune politique de sauvegarde/restauration de la base n'est définie ni testée.
-- Aucune revue de journalisation n'a été faite (quels champs partent vers Sentry/BetterStack).
+- La revue de ce qui part vers **Sentry** a été faite le 2026-08-05, au collecteur local
+  (D-026) : les transactions emportaient en-tête d'autorisation, cookie, corps et jeton
+  d'URL — corrigé et re-mesuré. Restent non observés : le canal `log` de Sentry (R-022) et
+  **tout** ce qui part vers BetterStack.
 - Aucun test de sécurité automatisé au-delà de Semgrep (pas de DAST, pas de fuzzing).
 
 Suivi : [RISKS.md](./RISKS.md).

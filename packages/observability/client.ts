@@ -7,6 +7,7 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
 import * as Sentry from "@sentry/nextjs";
 import { keys } from "./keys";
+import { scrubRequest } from "./scrub";
 
 export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
   Sentry.init({
@@ -20,6 +21,14 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
 
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
+
+    // Le client n'avait aucun filtre, alors que le serveur en annonçait un
+    // comme « dernier filet ». Une URL de navigateur transporte régulièrement
+    // un jeton en paramètre (D-026).
+    sendDefaultPii: false,
+
+    beforeSend: scrubRequest,
+    beforeSendTransaction: scrubRequest,
 
     replaysOnErrorSampleRate: 1,
 
@@ -36,8 +45,10 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
         maskAllText: true,
         blockAllMedia: true,
       }),
-      // Send console.log, console.error, and console.warn calls as logs to Sentry
-      Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
+      // `log` est exclu : le serveur applique déjà cette politique — « un
+      // journal de débogage n'a pas à devenir un flux vers un tiers » — et le
+      // client la contredisait, expédiant chaque `console.log` du navigateur.
+      Sentry.consoleLoggingIntegration({ levels: ["error", "warn"] }),
     ],
   });
 
