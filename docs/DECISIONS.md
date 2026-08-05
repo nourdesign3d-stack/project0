@@ -111,6 +111,50 @@ seul outil de graphe.
 
 ---
 
+## D-017 — Garde-fou Bash : tokenisation, après deux contournements d'audit
+
+**Date** : 2026-08-05
+**Contexte** : deux audits successifs ont contourné le garde-fou. Le premier avec des
+guillemets (8 formulations sur 11) : la version d'alors effaçait le *contenu* des
+guillemets pour ignorer la prose, donc `cat ".env.local"` devenait invisible. La
+réécriture suivante, à base de motifs ancrés au premier mot, a fermé ces 8 voies — le
+second audit en a ouvert **16 autres** : substitution `$(…)`, enrobage `env`,
+`bash -lc`, `docker-compose`, `mkfs.ext4`, `vim`, `git diff --no-index`, redirections…
+Et 6 faux positifs bloquaient les messages de commit parlant du garde-fou lui-même.
+**Décision** : abandonner l'analyse par expressions régulières sur texte brut. Un
+tokeniseur (`lib/shell-tokens.mjs`) découpe la ligne en invocations ; un argument entre
+guillemets est **un seul jeton**, jamais confondu avec une commande ; les substitutions
+et interpréteurs imbriqués sont réinjectés et analysés ; les enrobages (`sudo`, `env`,
+`pnpm exec`, `xargs`) sont dépliés jusqu'à la commande réelle. Les règles nomment leur
+commande et n'inspectent que les **arguments**. `vercel` passe en liste blanche : tout
+sauf `--help`/`--version`/`whoami` est refusé, car `vercel env pull` écrit les variables
+de production sur disque.
+**Vérifié** : 85 cas — les contournements des deux audits, les faux positifs, et le
+travail courant. Trois versions à motifs sont tombées ; celle-ci se distingue par sa
+structure, pas par ses motifs. R-016 reste **accepté** : un obfuscateur déterminé passera.
+
+---
+
+## D-016 — `overrides` Next : une seule version dans l'arbre, imposée
+
+**Date** : 2026-08-05
+**Contexte** : `@react-email/ui@6.9.1` (ajouté en D-015) dépend de `next@16.2.6`, sous le
+seuil de correction 16.2.11 — 9 alertes dont 4 hautes, réintroduites par le paquet même
+qui devait purger l'arbre. Relevé par le quatrième audit, qui a aussi prouvé la causalité
+en retirant l'`overrides` : la version vulnérable revient.
+**Décision** : `overrides: next: 16.2.12` dans `pnpm-workspace.yaml`. Découverte au
+passage : le champ `overrides` de `package.json` est **ignoré par pnpm 10 en workspace**
+— celui hérité du template (`parse5`) était donc inopérant ; le réglage doit vivre dans
+`pnpm-workspace.yaml`.
+**Conséquences** : toute dépendance transitive reçoit ce Next, quelle que soit sa
+déclaration. À chaque montée de Next, mettre à jour **l'override et les déclarations**
+ensemble. `apps/email` a été réparé dans la foulée : `packages/email` ne déclarait pas
+`@react-email/render`, le rendu échouait — le build d'`apps/email` est devenu un
+`email export` réel, branché dans `verify` et la CI, parce qu'un HTTP 200 du serveur de
+prévisualisation ne prouve pas qu'un template se rend.
+
+---
+
 ## D-015 — react-email 5 → 6, et exception nommée à la politique de confiance
 
 **Date** : 2026-08-05

@@ -2,73 +2,66 @@
 /**
  * Hook PreToolUse — refuse les commandes Bash dangereuses.
  *
- * Pourquoi un hook et pas seulement `permissions.deny` : la liste `deny` compare
- * des préfixes de commande, et ses motifs de lecture ne visent que l'outil Read.
- * Une lecture de secret par `cat` ou une suppression par `find -delete` lui
- * échappent. Le hook inspecte la ligne de commande entière.
- *
  * ── Ce que ce hook est ──
  * Un garde-fou déterministe contre l'erreur et le contournement accidentel.
  *
  * ── Ce qu'il n'est PAS ──
- * Une frontière de sécurité. Une commande suffisamment obscurcie passera :
- * encodage base64, variable construite morceau par morceau, script tiers,
- * interpréteur exotique. La vraie protection reste de ne jamais placer de secret
- * de production sur un poste de développement. Voir docs/SECURITY_MODEL.md.
+ * Une frontière de sécurité. Un obscurcissement déterminé passera : encodage,
+ * chaîne construite morceau par morceau, interpréteur tiers, variable résolue à
+ * l'exécution. La vraie protection reste de ne jamais placer de secret de
+ * production sur un poste de développement. Voir docs/SECURITY_MODEL.md, R-016.
  *
  * ── Comment il décide ──
- * La ligne est découpée en segments (`|`, `;`, `&&`, `||`). Pour chacun :
+ * La ligne est **tokenisée** (`lib/shell-tokens.mjs`) plutôt qu'analysée au
+ * motif. Trois versions antérieures reposaient sur des expressions régulières
+ * appliquées au texte brut ; les trois ont été contournées par un audit externe.
+ * Avec la tokenisation :
  *
- *   1. `sh -c '…'` / `bash -c '…'` : le contenu est réinjecté et analysé à son
- *      tour. Sans cela, une seule paire de guillemets rendait le hook aveugle.
- *   2. Les guillemets sont retirés **en gardant leur contenu**. Une version
- *      antérieure effaçait le contenu pour ignorer la prose : `cat ".env.local"`
- *      passait alors sans être vu. Correction issue d'un audit externe.
- *   3. Secrets : le chemin ne déclenche un refus que si le **premier mot** du
- *      segment est une commande qui lit ou copie un fichier, s'il y a une
- *      redirection d'entrée, ou s'il s'agit d'une affectation de variable.
- *      C'est ce qui distingue `cat .env.local` d'un message de commit qui en parle.
- *   4. Destruction : le motif doit correspondre **au premier mot** du segment,
- *      pas apparaître n'importe où. C'est ce qui laisse passer la prose sans
- *      avoir à effacer le contenu des guillemets.
+ *   - un argument entre guillemets est **un seul jeton** : un message de commit
+ *     qui parle de `rm -rf` n'est jamais confondu avec la commande ;
+ *   - les substitutions `$(…)` et les backticks sont extraits et analysés ;
+ *   - les enrobages (`sudo`, `env`, `pnpm exec`, `xargs`…) sont retirés pour
+ *     retrouver la commande réelle ;
+ *   - `sh -c '…'` est réinjecté et réanalysé ;
+ *   - le corps d'un heredoc est traité comme une donnée, pas comme des commandes.
+ *
+ * Chaque règle nomme la commande à laquelle elle s'applique et inspecte les
+ * **arguments**, jamais le texte entier.
  *
  * Contrat : JSON du hook sur stdin ; sortie 2 + message sur stderr = refus ;
  * sortie 0 = laisser passer.
  */
 
 import { isAbsolute, resolve } from "node:path";
+import { parseCommand, resolveInvocation } from "./lib/shell-tokens.mjs";
 
 const SECRET_PATHS = [
-  // Fichiers d'environnement réels — .env.example est explicitement toléré.
-  // Fin de nom : tout ce qui n'est pas un caractère de nom de fichier. Une liste
-  // fermée de séparateurs laissait passer `readFileSync(".env.local",…)` (virgule).
-  /(^|[\s=/(])\.env(\.local|\.production|\.development|\.test)?(?![\w.-])/,
-  /\.env\.[a-z]+\.local/,
+  /(^|\/)\.env(\.local|\.production|\.development|\.test)?$/,
+  /(^|\/)\.env\.[a-z]+\.local$/,
   /\.ssh\//,
-  /\.aws\/(credentials|config)/,
+  /\.aws\/(credentials|config)$/,
   /id_rsa/,
-  /\.pem(?![\w.-])/,
-  /\.p12(?![\w.-])/,
-  /\.keystore/,
+  /\.(pem|p12|keystore)$/,
 ];
 
-/**
- * Commandes qui ouvrent, lisent ou recopient un fichier. Comparées au **premier
- * mot** du segment : `git commit -m "… cat .env.local …"` n'est pas une lecture.
- */
+/** Commandes qui ouvrent, lisent, recopient ou éditent un fichier. */
 const READERS = new Set([
+  ".",
   "awk",
   "base64",
   "bat",
   "cat",
   "code",
   "cp",
+  "curl",
   "cut",
   "dd",
   "diff",
   "dotenv",
   "egrep",
+  "emacs",
   "fgrep",
+  "git",
   "grep",
   "gzip",
   "head",
@@ -77,6 +70,7 @@ const READERS = new Set([
   "ln",
   "more",
   "mv",
+  "nano",
   "nl",
   "node",
   "od",
@@ -99,118 +93,153 @@ const READERS = new Set([
   "tee",
   "tr",
   "uniq",
-  "xargs",
+  "vi",
+  "vim",
   "xxd",
   "yq",
   "zip",
 ]);
 
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+
+const INTERPRETERS = new Set(["node", "python", "python3", "perl", "ruby"]);
+
+// Version non ancrée des chemins sensibles, pour chercher DANS un script
+// passé à un interpréteur. `.env.example` reste toléré.
+const SECRET_MENTION =
+  /\.env(\.local|\.production|\.development|\.test)?(?![\w.-])|\.ssh\/|id_rsa|\.aws\/(credentials|config)|\.(pem|p12|keystore)(?![\w.-])/;
+
+/** `has(args, …)` : le mot figure-t-il parmi les arguments non quotés ? */
+const has = (args, ...words) =>
+  args.some((token) => !token.quoted && words.includes(token.value));
+
+const startsWith = (args, word) =>
+  args.some(
+    (token, index) =>
+      !token.quoted &&
+      token.value === word &&
+      args.slice(0, index).every((previous) => previous.value.startsWith("-"))
+  );
+
+const hasFlag = (args, test) =>
+  args.some((token) => !token.quoted && test(token.value));
+
 /**
- * Chaque règle nomme la commande attendue en tête de segment. Sans cet ancrage,
- * le simple fait d'écrire « rm -rf » dans un message de commit déclenchait un refus.
+ * Règles destructives. `check(args)` ne regarde que les arguments : le contenu
+ * d'un message ou d'un fichier ne peut pas les déclencher.
  */
 const DESTRUCTIVE = [
   {
-    commands: ["rm"],
-    pattern: /\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)+/,
+    command: "rm",
+    check: (args) => hasFlag(args, (v) => RECURSIVE_RM.test(v)),
     why: "suppression récursive ou forcée",
   },
   {
-    commands: ["find"],
-    pattern: /\s-delete\b/,
+    command: "find",
+    check: (args) => has(args, "-delete") || has(args, "-exec", "-execdir"),
     why: "suppression de masse via find",
   },
   {
-    commands: ["find"],
-    pattern: /-exec\s+rm\b/,
-    why: "suppression de masse via find -exec",
-  },
-  {
-    commands: ["git"],
-    pattern: /\breset\s+--hard\b/,
+    command: "git",
+    check: (args) => has(args, "reset") && has(args, "--hard"),
     why: "perte du travail non sauvegardé",
   },
   {
-    commands: ["git"],
-    pattern: /\bclean\s+-[a-zA-Z]*[dfx]/,
+    command: "git",
+    check: (args) =>
+      startsWith(args, "clean") &&
+      hasFlag(args, (v) => GIT_CLEAN_FLAGS.test(v)),
     why: "suppression de fichiers non suivis",
   },
   {
-    commands: ["git"],
-    pattern: /\bpush\b[^|;]*(--force(?!-with-lease)|\s-f\b)/,
+    command: "git",
+    check: (args) =>
+      has(args, "push") && hasFlag(args, (v) => v === "--force" || v === "-f"),
     why: "réécriture de l'historique distant",
   },
   {
-    commands: ["git"],
-    pattern: /\bbranch\s+-D\b/,
+    command: "git",
+    check: (args) => has(args, "branch") && has(args, "-D"),
     why: "suppression de branche non fusionnée",
   },
   {
-    commands: ["prisma"],
-    pattern: /\bmigrate\s+reset\b/,
+    command: "prisma",
+    check: (args) => has(args, "migrate") && has(args, "reset"),
     why: "destruction de la base",
   },
   {
-    commands: ["prisma"],
-    pattern: /\bdb\s+push\b/,
+    command: "prisma",
+    check: (args) => has(args, "db") && has(args, "push"),
     why: "modification de schéma hors migration versionnée",
   },
   {
-    commands: ["docker"],
-    pattern: /\bdown\b[^|;]*(\s-v\b|--volumes)/,
+    command: "docker",
+    check: (args) =>
+      has(args, "down") &&
+      hasFlag(args, (v) => v === "-v" || v === "--volumes"),
     why: "destruction du volume de données",
   },
   {
-    commands: ["docker"],
-    pattern: /\bvolume\s+rm\b/,
+    command: "docker",
+    check: (args) => has(args, "volume") && has(args, "rm", "prune"),
     why: "destruction d'un volume",
   },
   {
-    commands: ["docker"],
-    pattern: /\bsystem\s+prune\b/,
+    command: "docker",
+    check: (args) => has(args, "system") && has(args, "prune"),
     why: "nettoyage destructif global",
   },
-  { commands: ["mkfs"], pattern: /./, why: "formatage de système de fichiers" },
-  { commands: ["dd"], pattern: /\bif=/, why: "écriture disque de bas niveau" },
   {
-    commands: ["chmod"],
-    pattern: /-R\s+777\b/,
+    command: "mkfs",
+    check: () => true,
+    why: "formatage de système de fichiers",
+  },
+  {
+    command: "dd",
+    check: (args) => hasFlag(args, (v) => v.startsWith("if=")),
+    why: "écriture disque de bas niveau",
+  },
+  {
+    command: "chmod",
+    check: (args) => has(args, "-R") && has(args, "777"),
     why: "permissions dangereuses",
   },
   {
-    commands: ["vercel"],
-    pattern: /\b(deploy|--prod|env\s+(add|rm))\b/,
-    why: "action sur un environnement déployé",
+    // Liste blanche : seules les commandes de consultation inoffensives passent.
+    // `vercel env pull` écrit les variables de production sur le disque.
+    command: "vercel",
+    check: (args) =>
+      !args.every((token) =>
+        ["--help", "-h", "--version", "-v", "whoami"].includes(token.value)
+      ),
+    why: "action sur un environnement déployé ou récupération de ses variables",
   },
   {
-    commands: ["env", "printenv"],
-    pattern: /^(env|printenv)\s*$/,
+    command: "printenv",
+    check: () => true,
+    why: "affichage de variables d'environnement",
+  },
+  {
+    command: "env",
+    check: (args) => args.length === 0,
     why: "affichage de l'environnement complet",
   },
 ];
 
-// `pnpm db:push` et consorts : la commande destructive est le nom du script.
-const SCRIPT_ALIASES = [
-  {
-    pattern: /\bdb:push\b/,
-    why: "modification de schéma hors migration versionnée",
-  },
-];
+/** Scripts du dépôt dont le nom seul suffit à identifier l'action. */
+const SCRIPT_ALIASES = new Map([
+  ["db:push", "modification de schéma hors migration versionnée"],
+]);
 
-const PIPE_TO_SHELL = /\b(curl|wget)\b[^|;]*\|\s*(sudo\s+)?(sh|bash|zsh)\b/;
-const NESTED_SHELL = /^(?:sudo\s+)?(?:sh|bash|zsh|dash)\s+-c\s+(.+)$/s;
-const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
-const INPUT_REDIRECT = /(^|\s)<\s*\S/;
-const WRAPPER =
-  /^(sudo|pnpm|npm|npx|yarn|bun|bunx|time|nice)\s+(exec\s+|run\s+|dlx\s+|-{1,2}\S+\s+)*/;
-const WHITESPACE = /\s+/;
-const QUOTES = /['"`]/g;
 const TEMPORARY = /^(\/private)?\/(tmp|var\/folders)\//;
-
-const say = (text) => process.stderr.write(text);
+const RECURSIVE_RM = /^-[a-zA-Z]*[rRf]/;
+const GIT_CLEAN_FLAGS = /^-[a-zA-Z]*[dfx]/;
+const TILDE = /^~\//;
+const SHELL_EVAL_FLAG = /^-[a-z]*c$/;
+const INTERPRETER_EVAL_FLAG = /^-[a-zA-Z]*[epE]/;
 
 const deny = (reason, detail) => {
-  say(
+  process.stderr.write(
     "\n  ✗ Commande refusée par .claude/hooks/guard-bash.mjs\n" +
       `    Motif : ${reason}\n` +
       `    ${detail}\n\n` +
@@ -219,111 +248,118 @@ const deny = (reason, detail) => {
   process.exit(2);
 };
 
-/** Retire les guillemets en conservant ce qu'ils entourent. */
-const unquote = (text) => text.replace(QUOTES, "");
+const isSecretPath = (value) => {
+  const candidate = value.replace(TILDE, "");
 
-/** Premier mot réel du segment, une fois les enrobages retirés. */
-const commandOf = (segment) => {
-  let text = unquote(segment).trim();
-  let previous;
+  if (candidate.endsWith(".env.example")) {
+    return false;
+  }
 
-  do {
-    previous = text;
-    text = text.replace(WRAPPER, "");
-  } while (text !== previous);
-
-  return text.split(WHITESPACE)[0] ?? "";
+  return SECRET_PATHS.some((pattern) => pattern.test(candidate));
 };
 
-/**
- * Vrai si tous les chemins absolus du segment sont dans un dossier temporaire.
- * Les chemins sont normalisés : `/tmp/../Users/…` sort du bac à sable et ne doit
- * donc pas bénéficier de la tolérance (contournement relevé en audit).
- */
-const onlyTemporaryPaths = (segment) => {
-  const operands = unquote(segment)
-    .split(WHITESPACE)
-    .filter((token) => isAbsolute(token));
+/** Tous les chemins absolus visés sont-ils dans un dossier temporaire ? */
+const onlyTemporaryPaths = (args) => {
+  const paths = args
+    .map((token) => token.value)
+    .filter((value) => isAbsolute(value));
 
   return (
-    operands.length > 0 &&
-    operands.every((path) => TEMPORARY.test(resolve(path)))
+    paths.length > 0 && paths.every((path) => TEMPORARY.test(resolve(path)))
   );
 };
 
-const SEGMENT_SEPARATOR = /\|\||&&|[|;&\n]/;
+/** Refuse toute lecture, directe ou via interpréteur, d'un chemin sensible. */
+const checkSecrets = (command, args, assignments) => {
+  const values = [...assignments, ...args].map((token) => token.value);
 
-/** Refuse si le segment lit un chemin sensible. */
-const checkSecrets = (segment, head) => {
-  const bare = unquote(segment);
-  const probe = bare.replaceAll(".env.example", "«example»");
-
-  const touchesFile =
-    READERS.has(head) || INPUT_REDIRECT.test(bare) || ASSIGNMENT.test(bare);
-
-  if (touchesFile && SECRET_PATHS.some((pattern) => pattern.test(probe))) {
+  if (
+    (READERS.has(command) || command === "") &&
+    values.some((value) => isSecretPath(value))
+  ) {
     deny(
       "lecture ou copie d'un fichier de secrets",
       "Clés et identifiants ne se lisent pas depuis un agent."
     );
   }
-};
 
-/** Refuse si le segment est une commande destructive hors bac à sable. */
-const checkDestructive = (segment, head) => {
-  if (onlyTemporaryPaths(segment)) {
-    return;
-  }
-
-  const bare = unquote(segment);
-
-  for (const { commands, pattern, why } of DESTRUCTIVE) {
-    if (commands.includes(head) && pattern.test(bare)) {
-      deny(
-        `commande destructive — ${why}`,
-        `Commande : ${segment.slice(0, 120)}`
-      );
-    }
-  }
-
-  for (const { pattern, why } of SCRIPT_ALIASES) {
-    if (pattern.test(bare)) {
-      deny(
-        `commande destructive — ${why}`,
-        `Commande : ${segment.slice(0, 120)}`
-      );
-    }
+  // `node -e '…readFileSync(".env.local")…'` : le chemin sensible est DANS le
+  // script passé en argument, pas un argument distinct.
+  if (
+    INTERPRETERS.has(command) &&
+    hasFlag(args, (v) => INTERPRETER_EVAL_FLAG.test(v)) &&
+    args.some((token) => token.quoted && SECRET_MENTION.test(token.value))
+  ) {
+    deny(
+      "lecture d'un fichier de secrets via un interpréteur",
+      "Clés et identifiants ne se lisent pas depuis un agent."
+    );
   }
 };
 
-const inspect = (command, depth = 0) => {
-  if (depth > 3) {
+/** Refuse les commandes destructives hors bac à sable temporaire. */
+const checkDestructive = (command, args) => {
+  if (SCRIPT_ALIASES.has(command)) {
+    deny(
+      `commande destructive — ${SCRIPT_ALIASES.get(command)}`,
+      `Commande : ${command}`
+    );
+  }
+
+  if (onlyTemporaryPaths(args)) {
     return;
   }
 
-  if (PIPE_TO_SHELL.test(unquote(command))) {
-    deny("exécution de code téléchargé", `Commande : ${command.slice(0, 120)}`);
+  for (const rule of DESTRUCTIVE) {
+    if (rule.command === command && rule.check(args)) {
+      deny(
+        `commande destructive — ${rule.why}`,
+        `Commande : ${[command, ...args.map((t) => t.value)]
+          .join(" ")
+          .slice(0, 120)}`
+      );
+    }
+  }
+};
+
+const inspect = (input, depth = 0) => {
+  if (depth > 4) {
+    return;
   }
 
-  for (const rawSegment of command.split(SEGMENT_SEPARATOR)) {
-    const segment = rawSegment.trim();
+  const { invocations, subshells } = parseCommand(input);
 
-    if (!segment) {
-      continue;
+  for (const nested of subshells) {
+    inspect(nested, depth + 1);
+  }
+
+  let previous = null;
+
+  for (const tokens of invocations) {
+    const { command, args, assignments } = resolveInvocation(tokens);
+
+    // `sh -c '…'` : ce qui est réellement exécuté se trouve dans l'argument.
+    if (SHELLS.has(command) && hasFlag(args, (v) => SHELL_EVAL_FLAG.test(v))) {
+      const script = args.find(
+        (token) => token.quoted || !token.value.startsWith("-")
+      );
+
+      if (script) {
+        inspect(script.value, depth + 1);
+        previous = command;
+        continue;
+      }
     }
 
-    // `sh -c '…'` : analyser ce qui est réellement exécuté.
-    const nested = unquote(segment).match(NESTED_SHELL);
-
-    if (nested) {
-      inspect(nested[1], depth + 1);
-      continue;
+    // Télécharger puis exécuter : la commande précédente est un rapatriement.
+    if (SHELLS.has(command) && (previous === "curl" || previous === "wget")) {
+      deny("exécution de code téléchargé", `Commande : ${input.slice(0, 120)}`);
     }
 
-    const head = commandOf(segment);
+    checkSecrets(command, args, assignments);
+    checkDestructive(command, args);
 
-    checkSecrets(segment, head);
-    checkDestructive(segment, head);
+    previous = command;
   }
 };
 
@@ -343,8 +379,9 @@ try {
     inspect(String(payload?.tool_input?.command ?? ""));
   }
 } catch {
-  // Un hook illisible ne doit pas bloquer le travail : on laisse passer et on le dit.
-  say("  guard-bash : entrée illisible, commande non inspectée.\n");
+  process.stderr.write(
+    "  guard-bash : entrée illisible, commande non inspectée.\n"
+  );
 }
 
 process.exit(0);

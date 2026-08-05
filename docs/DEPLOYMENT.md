@@ -45,17 +45,20 @@ Activées le 2026-08-05. GitHub compare l'arbre de dépendances à sa base de fa
 affiche les correspondances dans l'onglet *Security*. **Rien ne bouge tout seul** : les
 correctifs automatiques ne sont pas activés.
 
-À l'activation : **340 alertes** au total. Les montées de version de Next en ont
-fermé **271**. Il en restait **69** : 28 sur `next` (fantômes, voir ci-dessous), 30 sur
-`hono`, 12 sur `undici`, le reste sur des paquets transitifs.
+Historique : **340 alertes** à l'activation. Traitement par montées de version de Next
+(16.1.6 → 16.2.12, puis `overrides` sur les dépendances transitives — D-016) :
+**280 fermées, 60 ouvertes** au 2026-08-05 — 32 `hono`, 12 `undici`, le reste transitif,
+**0 sur `next`**. Le compte vivant fait foi dans l'onglet Security ; ces chiffres datent.
 
 ⚠️ **Piège de comptage** : `gh api …/dependabot/alerts` renvoie **30 résultats par page**.
 Sans `--paginate`, on lit une taille de page et on la prend pour un total. Première
 lecture faussée de cette manière.
 
-Les 28 alertes qui visaient `next` provenaient de `@react-email/preview-server@5.2.9`,
-qui dépendait de `next@16.1.6`. Elles étaient **réelles**, pas fantômes : la montée de
-`react-email` en 6.9.1 a retiré `next` de cet arbre.
+Leçon de méthode, payée trois fois : vérifier la disparition de l'ancien symptôme
+(« 16.1.6 a-t-il disparu ? ») ne prouve pas l'absence du problème (« reste-t-il une
+version vulnérable ? »). C'est l'`overrides` de `pnpm-workspace.yaml` qui garantit
+désormais une seule version de Next dans l'arbre, quelles que soient les dépendances
+transitives (D-016).
 
 ### Règle de tri — pour ne pas tourner en rond
 

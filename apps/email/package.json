@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "email build --dir ../../packages/email/templates",
+    "build": "email export --dir ../../packages/email/templates --outDir .cache/export",
     "dev": "email dev --port 3003 --dir ../../packages/email/templates",
     "export": "email export --dir ../../packages/email/templates",
     "clean": "git clean -xdf .cache .turbo dist node_modules"
