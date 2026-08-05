@@ -140,6 +140,38 @@ const run = (command, args, options = {}) => {
   }
 };
 
+/** Sortie capturée, sans affichage : pour interroger `gh` sans polluer l'écran. */
+const capture = (command, args) => {
+  rl.pause();
+  try {
+    return execFileSync(command, args, {
+      cwd: root,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } finally {
+    rl.resume();
+  }
+};
+
+const owner = () => {
+  try {
+    return capture("gh", ["api", "user", "--jq", ".login"]);
+  } catch {
+    return "";
+  }
+};
+
+const repoExists = (repository) => {
+  try {
+    capture("gh", ["repo", "view", repository, "--json", "name"]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const isPortFree = (port) =>
   new Promise((resolve) => {
     const server = createServer();
@@ -329,22 +361,57 @@ if (
   say("    historique réinitialisé.");
 
   if (await confirm("Créer le dépôt GitHub privé et pousser ?", false)) {
-    try {
-      run("gh", [
-        "repo",
-        "create",
-        name,
-        "--private",
-        "--source=.",
-        "--remote=origin",
-        "--push",
-      ]);
-    } catch {
-      // Le dépôt distant peut avoir été créé alors que seul le push a échoué :
-      // ne pas préjuger de la cause, donner la commande qui reprend la main.
-      say("    → le dépôt a pu être créé sans que le push aboutisse.");
-      say("       Vérifier :  git remote -v  et  gh auth status");
-      say("       Reprendre :  git push -u origin main");
+    let repository = name;
+
+    // Vérifier la disponibilité du nom avant d'appeler `gh repo create` :
+    // sinon l'échec remonte sous forme d'erreur GraphQL brute, après que
+    // l'historique local a déjà été réinitialisé.
+    while (repository && repoExists(repository)) {
+      say(`    Le dépôt ${repository} existe déjà sur ce compte.`);
+
+      if (await confirm("Le réutiliser comme remote de ce dossier ?", false)) {
+        break;
+      }
+
+      repository = await ask("Autre nom (vide pour renoncer)", "");
+    }
+
+    if (!repository) {
+      say(
+        "    → dépôt distant non configuré. `gh repo create` reste possible plus tard."
+      );
+    } else if (repoExists(repository)) {
+      // Dépôt existant : on se contente d'y rattacher le dossier.
+      try {
+        run("git", [
+          "remote",
+          "add",
+          "origin",
+          `https://github.com/${owner()}/${repository}.git`,
+        ]);
+        run("git", ["push", "-u", "origin", "main"]);
+      } catch {
+        say("    → rattachement ou push refusé (dépôt non vide ?).");
+        say("       Vérifier :  git remote -v  puis  git push -u origin main");
+      }
+    } else {
+      try {
+        run("gh", [
+          "repo",
+          "create",
+          repository,
+          "--private",
+          "--source=.",
+          "--remote=origin",
+          "--push",
+        ]);
+      } catch {
+        // Le dépôt distant peut avoir été créé alors que seul le push a échoué :
+        // ne pas préjuger de la cause, donner la commande qui reprend la main.
+        say("    → le dépôt a pu être créé sans que le push aboutisse.");
+        say("       Vérifier :  git remote -v  et  gh auth status");
+        say("       Reprendre :  git push -u origin main");
+      }
     }
   }
 }
