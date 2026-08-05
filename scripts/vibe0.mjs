@@ -340,7 +340,11 @@ if (
         "--push",
       ]);
     } catch {
-      say("    → échec : vérifier `gh auth status`.");
+      // Le dépôt distant peut avoir été créé alors que seul le push a échoué :
+      // ne pas préjuger de la cause, donner la commande qui reprend la main.
+      say("    → le dépôt a pu être créé sans que le push aboutisse.");
+      say("       Vérifier :  git remote -v  et  gh auth status");
+      say("       Reprendre :  git push -u origin main");
     }
   }
 }

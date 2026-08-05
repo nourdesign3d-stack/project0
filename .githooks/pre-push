@@ -17,7 +17,17 @@ if [ "${ALLOW_DIRECT_PUSH_MAIN}" = "1" ]; then
   exit 0
 fi
 
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
+# Un SHA distant nul signifie que la branche n'existe pas encore côté serveur.
+# C'est le tout premier push d'un dépôt neuf : il n'y a ni branche de départ, ni
+# pull request possible, ni CI. Le bloquer n'aurait aucun sens.
+empty_sha="0000000000000000000000000000000000000000"
+
+while read -r _local_ref _local_sha remote_ref remote_sha; do
+  if [ "${remote_ref}" = "${protected_branch}" ] && [ "${remote_sha}" = "${empty_sha}" ]; then
+    echo "pre-push : création initiale de main sur le dépôt distant, autorisée." >&2
+    continue
+  fi
+
   if [ "${remote_ref}" = "${protected_branch}" ]; then
     echo "" >&2
     echo "  ✗ Push direct sur main refusé." >&2
