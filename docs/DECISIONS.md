@@ -111,6 +111,57 @@ seul outil de graphe.
 
 ---
 
+## D-026 — Sentry : filtrer les deux canaux, pas seulement les erreurs
+
+**Date** : 2026-08-05
+**Contexte** : R-018 affirmait Sentry « bridé », R-010 notait que personne n'avait jamais
+observé ce qui en sortait. Les deux tenaient sur la lecture du code, jamais sur une mesure.
+
+**Méthode** : plutôt qu'ouvrir un compte Sentry et lire son interface, un **collecteur
+local** — un serveur HTTP de vingt lignes — a reçu le DSN. Le SDK lui a envoyé ses
+enveloppes, qu'on lit octet par octet. Aucun compte, aucune donnée sortie de la machine, et
+une précision qu'aucune interface ne donne.
+
+**Ce que la mesure a montré**, avec des marqueurs reconnaissables dans l'en-tête
+`authorization`, le cookie, le corps et la chaîne d'URL :
+
+| Canal | Verdict initial |
+| --- | --- |
+| `type=event` (erreur) | **correctement filtré** — `vars: null`, `request.headers/data: null` |
+| `type=transaction` | **en-tête, cookie, corps et jeton d'URL, en clair** |
+| runtime edge (proxy) | **aucun filtre**, et il voit toutes les requêtes |
+
+`beforeSend` ne s'applique qu'aux **erreurs**. Les transactions exigent
+`beforeSendTransaction`, absent. Avec `tracesSampleRate: 1`, c'est **chaque requête** —
+erreur ou non — qui partait avec son en-tête d'autorisation et son cookie de session.
+
+**Décision** : un filtre unique (`packages/observability/scrub.ts`), appliqué aux deux
+canaux et aux trois runtimes. Un garde-fou qui ne couvre qu'une sortie sur trois donne une
+fausse assurance — pire que pas de garde-fou.
+
+Le filtre applique une **politique**, pas une liste de champs : aucune chaîne de requête ne
+sort, où qu'elle se trouve. La première version ne vidait que `request.query_string` ; la
+re-mesure a montré le jeton survivant dans `request.url`,
+`contexts.trace.data["http.target"]` et `contexts.nextjs.request_path`. Une liste de champs
+aurait été à refaire à chaque version du SDK.
+
+**Re-mesuré après correctif** : les quatre marqueurs ont disparu ; chemin, méthode,
+transaction, message et pile sont conservés — filtrer n'est utile que si le diagnostic
+reste possible, sans quoi le filtre finit contourné.
+
+**Deux corrections de cohérence au passage** : le client expédiait chaque `console.log` du
+navigateur alors que le serveur excluait explicitement ce niveau, en le justifiant ; et
+`DEPLOYMENT.md` affirmait « Sentry activé uniquement quand `VERCEL` est définie ». C'est
+faux : seul le **plugin de build** l'est. `instrumentation.ts` initialise le SDK dès qu'un
+DSN existe. Un développeur qui renseigne un DSN en local envoie donc à Sentry en croyant
+que non.
+
+**Limite assumée** : le canal `log` (`enableLogs: true`) expédie tout `console.error` ou
+`console.warn` sans passer par ces filtres. Aucune correction posée — je n'ai pas mesuré sa
+forme. Devenu R-022.
+
+---
+
 ## D-025 — Neon vérifié : le pilote standard suffit, `directUrl` n'est pas nécessaire
 
 **Date** : 2026-08-05
