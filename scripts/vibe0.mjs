@@ -415,11 +415,12 @@ if (
   }
 }
 
-// Le schéma existe dans `schema.prisma`, mais aucune migration n'est versionnée :
-// une base fraîche n'a donc aucune table. Le premier utilisateur qui franchit
-// l'authentification tombait alors sur une erreur serveur, la page d'accueil
+// Une base fraîche est vide : sans cette étape, le premier utilisateur qui
+// franchit l'authentification tombe sur une erreur serveur, la page d'accueil
 // authentifiée interrogeant `Page`. Constaté en exécutant le parcours pour de
 // vrai le 2026-08-05 — invisible tant que personne ne passait `/sign-in`.
+// `migrate dev` applique la migration initiale versionnée ; il n'en crée une
+// nouvelle que si le schéma a déjà été modifié.
 if (
   databaseUp &&
   (await confirm("Appliquer le schéma à la base (pnpm migrate) ?", true))

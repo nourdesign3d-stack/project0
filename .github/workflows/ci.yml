@@ -120,6 +120,22 @@ jobs:
     # Nécessite une application démarrable (clés de service). À activer via la variable
     # de dépôt ENABLE_E2E=true. Voir docs/DEPLOYMENT.md.
     if: vars.ENABLE_E2E == 'true'
+    # Le job démarre lui-même l'application (E2E_START_SERVER), qui exige une base
+    # joignable : `DATABASE_URL` du workflow pointe sur ce service.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -129,17 +145,25 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @repo/database run build
+      # Sans schéma appliqué, la page d'accueil authentifiée renvoie 500 : la
+      # table qu'elle interroge n'existe pas. `migrate:deploy` n'applique que
+      # des migrations versionnées — jamais `db push`.
+      - run: pnpm migrate:deploy
       - run: pnpm e2e:install
       - name: Playwright
         run: pnpm e2e
         env:
-          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+          # Aucune URL de préversion n'est fournie : Playwright démarre l'app.
+          E2E_START_SERVER: "true"
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          # Sans ces deux secrets, le parcours authentifié reste sauté — le job
+          # Sans ces secrets, le parcours authentifié reste sauté — le job
           # serait vert sans jamais avoir testé une connexion.
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
           E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+          # Clerk vérifie chaque nouvel appareil : en CI, la machine est toujours
+          # neuve, donc ce code est exigé à chaque exécution.
+          E2E_USER_OTP: ${{ secrets.E2E_USER_OTP }}
 
       # Les rapports peuvent contenir des captures d'écran : ne jamais y laisser de secret.
       - name: Rapport Playwright
