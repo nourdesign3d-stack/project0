@@ -158,6 +158,31 @@ const capture = (command, args) => {
   }
 };
 
+/**
+ * `docker compose up -d` rend la main avant que Postgres accepte une connexion.
+ * Migrer aussitôt échouerait sur une base pourtant en cours de démarrage.
+ */
+const waitForDatabase = async (attempts = 30) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      capture("docker", [
+        "compose",
+        "exec",
+        "-T",
+        "postgres",
+        "pg_isready",
+        "-U",
+        "postgres",
+      ]);
+      return true;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  return false;
+};
+
 const owner = () => {
   try {
     return capture("gh", ["api", "user", "--jq", ".login"]);
@@ -367,6 +392,8 @@ if (await confirm("Installer les dépendances (pnpm install) ?", true)) {
   }
 }
 
+let databaseUp = false;
+
 if (
   await confirm(
     `Démarrer Postgres sur le port ${port} (docker compose up -d) ?`,
@@ -375,6 +402,7 @@ if (
 ) {
   try {
     run("docker", ["compose", "up", "-d"]);
+    databaseUp = true;
   } catch {
     // Deux causes fréquentes, et rien ne permet de trancher ici :
     // Docker éteint, ou port déjà publié par un conteneur d'un autre projet.
@@ -384,6 +412,31 @@ if (
     say("       DATABASE_URL dans les .env.local, et relancer :");
     say("       docker compose up -d");
     problems.push("la base de données n'a pas démarré");
+  }
+}
+
+// Le schéma existe dans `schema.prisma`, mais aucune migration n'est versionnée :
+// une base fraîche n'a donc aucune table. Le premier utilisateur qui franchit
+// l'authentification tombait alors sur une erreur serveur, la page d'accueil
+// authentifiée interrogeant `Page`. Constaté en exécutant le parcours pour de
+// vrai le 2026-08-05 — invisible tant que personne ne passait `/sign-in`.
+if (
+  databaseUp &&
+  (await confirm("Appliquer le schéma à la base (pnpm migrate) ?", true))
+) {
+  const ready = await waitForDatabase();
+
+  if (ready) {
+    try {
+      run("pnpm", ["migrate", "--name", "init"]);
+    } catch {
+      say("    → migration échouée. Reprendre avec : pnpm migrate --name init");
+      problems.push("le schéma n'a pas été appliqué");
+    }
+  } else {
+    say("    → la base n'accepte pas encore de connexion.");
+    say("       Reprendre avec : pnpm migrate --name init");
+    problems.push("le schéma n'a pas été appliqué");
   }
 }
 

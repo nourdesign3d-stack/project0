@@ -111,6 +111,38 @@ seul outil de graphe.
 
 ---
 
+## D-018 — Vérifier les services tiers sur un projet jetable, jamais sur la graine
+
+**Date** : 2026-08-05
+**Contexte** : quatre chemins restaient non exécutés faute de clés de service (R-006,
+R-008, R-013, H-007). Les tester dans la graine y aurait introduit des clés, une
+instance Clerk et une base peuplée — exactement le résidu que `project:init` s'efforce
+d'éliminer (R-017).
+**Décision** : créer un projet **jetable** avec `vibe0`, y saisir des clés de
+développement, exécuter le parcours, puis reporter les seuls **constats** dans la graine
+par pull request. Aucune clé, aucun identifiant, aucune donnée ne remonte.
+**Conséquences** — la première exécution réelle a révélé quatre défauts qu'aucune
+relecture n'avait vus, parce qu'aucun d'eux n'est visible sans franchir `/sign-in` :
+
+1. `getByLabel(/password/i)` visait aussi le bouton « Show password » de Clerk, et
+   `getByRole("button", {name: /continue|sign in/i})` aussi « Continue with Google » :
+   Playwright refusait d'agir. Libellés désormais **ancrés**.
+2. Clerk interpose une **vérification d'appareil** (code à usage unique) entre le mot de
+   passe et la session — donc à chaque exécution en CI, où la machine est toujours neuve.
+   Le test ne la connaissait pas ; il l'assume maintenant via `E2E_USER_OTP`.
+3. Un refus du fournisseur se présentait comme « l'URL n'a pas changé », la vraie cause
+   restant dans le rapport HTML. Le message du fournisseur est désormais relevé et jeté.
+4. Aucune migration n'est versionnée : une base fraîche n'a **aucune table**, alors que
+   la page d'accueil authentifiée interroge `Page`. `vibe0` applique maintenant le schéma
+   après avoir démarré Postgres, et le test e2e recharge la page pour constater qu'elle
+   ne renvoie pas une erreur serveur — quitter `/sign-in` ne prouvait rien.
+
+Mesure obtenue : parcours authentifié **5/5**, et R-013 confirmé (une route hors du
+groupe `(authenticated)` répond `200` à un anonyme). Ce qui reste non exécuté — Stripe,
+BaseHub, Sentry, IA — le reste explicitement.
+
+---
+
 ## D-017 — Garde-fou Bash : tokenisation, après deux contournements d'audit
 
 **Date** : 2026-08-05

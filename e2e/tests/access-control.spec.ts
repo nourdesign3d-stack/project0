@@ -2,10 +2,18 @@ import { expect, test } from "@playwright/test";
 
 const AUTH_ROUTE = /sign-in|sign-up/;
 const SIGN_IN_LINK = /sign in|se connecter/i;
-const EMAIL_FIELD = /email/i;
-const PASSWORD_FIELD = /password|mot de passe/i;
-const SUBMIT_BUTTON = /continue|sign in/i;
+// Ancrées : un libellé partiel attrape plusieurs éléments et Playwright refuse
+// alors d'agir (« strict mode violation »). Constaté à la première exécution
+// réelle : /password/i visait aussi le bouton « Show password », et
+// /continue|sign in/i visait aussi « Continue with Google ».
+const EMAIL_FIELD = /^(email address|email|adresse e-?mail)$/i;
+const PASSWORD_FIELD = /^(password|mot de passe)$/i;
+const SUBMIT_BUTTON = /^(continue|sign in|se connecter|continuer)$/i;
+const VERIFICATION_CODE = /verification code|code de v[ée]rification/i;
 const NOT_SIGN_IN_URL = /^(?!.*sign-in).*$/;
+// Messages d'erreur de Clerk. Sélecteur de classe : ces nœuds ne portent pas de
+// rôle ARIA exploitable. À revoir si le fournisseur d'identité change.
+const CLERK_ERROR = '[class*="cl-formFieldErrorText"], [class*="cl-alertText"]';
 
 const UNAUTHORIZED_STATUSES = [401, 403, 404];
 
@@ -54,6 +62,11 @@ test.describe("contrôle d'accès", () => {
  */
 const email = process.env.E2E_USER_EMAIL;
 const password = process.env.E2E_USER_PASSWORD;
+// Clerk vérifie tout nouvel appareil par code à usage unique — donc à chaque
+// exécution en CI, où la machine est toujours neuve. Sans code, ce test ne peut
+// pas aller au bout. Avec une adresse de test Clerk (`+clerk_test@example.com`),
+// le code attendu est fixe et documenté par le fournisseur.
+const otp = process.env.E2E_USER_OTP;
 
 test.describe("parcours authentifié", () => {
   test.skip(
@@ -67,6 +80,62 @@ test.describe("parcours authentifié", () => {
     await page.getByLabel(PASSWORD_FIELD).fill(password as string);
     await page.getByRole("button", { name: SUBMIT_BUTTON }).click();
 
+    // Vérification d'appareil : Clerk l'interpose entre le mot de passe et la
+    // session. L'attente explicite évite aussi de contrôler le refus trop tôt,
+    // avant que le fournisseur ait répondu.
+    const codeField = page.getByRole("textbox", { name: VERIFICATION_CODE });
+    const codeRequired = await codeField
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (codeRequired) {
+      if (!otp) {
+        throw new Error(
+          "vérification d'appareil exigée par Clerk : fournir E2E_USER_OTP " +
+            "(code fixe du fournisseur pour une adresse +clerk_test@example.com)"
+        );
+      }
+
+      await codeField.fill(otp);
+      // Clerk valide souvent dès la saisie complète ; le bouton peut avoir
+      // disparu entre-temps, ce qui n'est pas un échec.
+      await page
+        .getByRole("button", { name: SUBMIT_BUTTON })
+        .click({ timeout: 5000 })
+        .catch(() => undefined);
+    }
+
+    // Le fournisseur peut refuser (compte inexistant, mot de passe faux, code
+    // invalide). Sans ce contrôle, l'échec se présente comme « l'URL n'a pas
+    // changé » et la vraie cause reste dans le rapport HTML.
+    // Le motif vide est ignoré : Clerk monte un conteneur d'alerte inoccupé.
+    const rejections = (
+      await page
+        .getByRole("alert")
+        .or(page.locator(CLERK_ERROR))
+        .allInnerTexts()
+    )
+      .map((text) => text.trim())
+      .filter(Boolean);
+
+    if (rejections.length > 0) {
+      throw new Error(
+        `authentification refusée par le fournisseur : ${rejections.join(" — ")}`
+      );
+    }
+
     await expect(page).toHaveURL(NOT_SIGN_IN_URL, { timeout: 20_000 });
+
+    // Quitter /sign-in ne prouve pas que l'application fonctionne : une erreur
+    // serveur s'affiche à la même URL et laissait ce test au vert. C'est
+    // exactement le cas d'une base sans migration, la table interrogée par la
+    // page d'accueil authentifiée n'existant pas.
+    const landing = await page.reload();
+
+    expect(
+      landing?.status(),
+      "la page authentifiée renvoie une erreur serveur"
+    ).toBeLessThan(400);
   });
 });

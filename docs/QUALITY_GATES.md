@@ -33,11 +33,28 @@ Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur**, sur tous
 | Contrôle | Condition |
 | --- | --- |
 | `pnpm build` (complet) | `BASEHUB_TOKEN` disponible (build de `@repo/cms` requis par `apps/web`) |
-| `pnpm e2e` | application démarrée + `E2E_BASE_URL` ; scénarios authentifiés ignorés sans identifiants de test |
+| `pnpm e2e` | application démarrée + `E2E_BASE_URL` ; scénarios authentifiés ignorés sans identifiants de test (voir ci-dessous) |
 | `pnpm semgrep` | Semgrep installé localement (`brew install semgrep` / `pipx install semgrep`) — toujours disponible en CI |
 
 Ces conditions ne sont pas des exemptions : quand elles ne sont pas remplies, le contrôle
 est déclaré **non exécuté**, jamais réussi.
+
+### Parcours authentifié
+
+Trois variables, jamais versionnées, jamais issues d'un compte réel :
+
+| Variable | Rôle |
+| --- | --- |
+| `E2E_USER_EMAIL` | compte de test du fournisseur d'identité |
+| `E2E_USER_PASSWORD` | son mot de passe |
+| `E2E_USER_OTP` | code de vérification d'appareil — **exigé à chaque exécution en CI**, où la machine est toujours neuve |
+
+Clerk interpose une vérification d'appareil entre le mot de passe et la session. Avec une
+adresse de test (`…+clerk_test@example.com`), le code est fixe et documenté par le
+fournisseur ; aucun e-mail n'est réellement envoyé. Sans `E2E_USER_OTP`, le test échoue
+avec un message explicite plutôt que sur un délai d'attente.
+
+Vérifié le 2026-08-05 sur un projet jetable — voir D-018.
 
 ## Règles de gate
 
