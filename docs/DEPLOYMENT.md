@@ -11,6 +11,12 @@
 | `build-full` | `pnpm build` complet (inclut `@repo/cms` et `apps/web`) | `vars.ENABLE_FULL_BUILD == 'true'` **et** secret `BASEHUB_TOKEN` configuré |
 | `e2e` | Postgres éphémère → `migrate:deploy` → Playwright démarre l'app et joue les parcours critiques | `vars.ENABLE_E2E == 'true'` |
 
+⚠️ **`BASEHUB_TOKEN` ne suffit pas.** `@repo/cms` interroge une structure de contenu précise —
+`blog.posts`, `legalPages`, avec auteurs, catégories et corps. Le dépôt BaseHub doit être créé
+**depuis le modèle next-forge** : un dépôt vide fait générer des types sans correspondance, et
+`apps/web` ne compile pas. Vérifié le 2026-08-05 — sans jeton, `basehub build` échoue
+explicitement (« Token not found »), ce qui est le bon comportement.
+
 Permissions : `contents: read` au niveau du workflow. Aucun job de test n'obtient
 d'autorisation d'écriture.
 
