@@ -48,7 +48,7 @@ seule protection est la vérification de signature.
 | --- | --- | --- |
 | Authentification | Clerk (`packages/auth`) | actif, non configuré (clés absentes) |
 | Protection de routes | aucune au niveau proxy, **par choix** : Clerk 7 déprécie la protection par correspondance de chemins, qui peut laisser des ressources joignables (D-019). L'autorisation vit dans les layouts, pages, route handlers et server actions ; `apps/app/__tests__/route-protection.test.ts` échoue pour toute route sans contrôle ni déclaration publique justifiée | **couvert contre l'oubli, pas contre l'erreur** |
-| En-têtes de sécurité | Nosecone (`packages/security`) | actif |
+| En-têtes de sécurité | Nosecone (`packages/security`), appliqué par le proxy des **trois** apps | **actif, mesuré le 2026-08-06** (D-034) sur `apps/web` et `apps/api` — il ne l'était sur aucune des deux avant. ⚠️ **CSP désactivée** par configuration : R-025 |
 | Bot / WAF | **aucun** — Arcjet retiré le 2026-08-05 (D-014) | **absent, assumé** |
 | Limitation de débit | Upstash (`packages/rate-limit`) | câblé, clé absente |
 | Validation des variables d'environnement | Zod + `@t3-oss/env-nextjs` | actif |
