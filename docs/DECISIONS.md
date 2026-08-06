@@ -111,6 +111,49 @@ seul outil de graphe.
 
 ---
 
+## D-031 — BaseHub retiré, pages légales écrites en dur
+
+**Date** : 2026-08-05
+**Contexte** : BaseHub alimentait la page d'accueil, le blog, les pages légales, le pied de
+page et le plan du site de `apps/web`. Il n'a jamais été activé : `basehub build` échoue
+sans jeton, donc `apps/web` n'était **pas construit en CI** (R-007) — non vérifié depuis la
+création du dépôt.
+
+**Ce que la mise en route aurait coûté** : un compte, un dépôt créé **depuis le modèle
+next-forge** — un dépôt vide n'a pas les types interrogés (`blog.posts`, `legalPages`), le
+build échouerait —, un jeton, et du contenu à écrire.
+
+**Ce qu'un CMS apporte** : permettre à quelqu'un **qui ne touche pas au code** de modifier
+le contenu sans redéployer. Personne n'est dans ce cas ici. Et pour un contenu publié par
+automatisation, l'argument s'inverse : des fichiers dans le dépôt donnent gratuitement la
+relecture avant publication (une pull request), le versionnement et le retour arrière, là
+où un CMS exigerait un jeton **en écriture** et un flux de validation à construire.
+
+**Décision** : retirer `packages/cms`, supprimer le blog, écrire les pages légales en
+composants statiques.
+
+**Conséquences** :
+
+- `apps/web` **se construit sans aucun jeton**. Le build complet entre dans le job
+  `quality` et tourne à chaque exécution. Le job `build-full` et la variable
+  `ENABLE_FULL_BUILD` disparaissent. **R-007 est fermé** ;
+- une dépendance de service en moins (R-009), un secret en moins ;
+- les liens « Privacy » et « Terms » du widget Clerk, **cassés jusqu'ici**, mènent
+  désormais quelque part ;
+- deux endroits à tenir à jour quand une page légale est ajoutée : le pied de page et le
+  plan du site. C'est écrit en commentaire aux deux endroits — le parcours de dossiers du
+  plan du site ne descend que d'un niveau et manquerait la route imbriquée.
+
+**Ce que les pages contiennent** : la **structure** d'une politique de confidentialité et
+de conditions d'utilisation, avec un bandeau visible indiquant qu'elles ne sont pas
+rédigées. Écrire un faux texte juridique d'allure crédible aurait été pire que l'absence de
+page : cela engage sans que personne l'ait voulu. R-024 suit leur rédaction.
+
+**Réversible** : BaseHub est un package, pas une fondation. Le jour où un rédacteur existe,
+il se rebranche — les sept fichiers concernés sont identifiés dans ce commit.
+
+---
+
 ## D-030 — Stripe vérifié en livraison réelle
 
 **Date** : 2026-08-05

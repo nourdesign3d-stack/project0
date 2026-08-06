@@ -1,11 +1,16 @@
-import { legal } from "@repo/cms";
 import { Status } from "@repo/observability/status";
 import Link from "next/link";
 import { env } from "@/env";
 
-export const Footer = async () => {
-  const legalPages = await legal.getPostsMeta();
+// Pages légales statiques depuis le retrait du CMS (D-031). Toute page ajoutée
+// sous `legal/` doit apparaître ici **et** dans le plan du site : sans cela elle
+// existe sans être atteignable.
+const LEGAL_PAGES = [
+  { title: "Politique de confidentialité", href: "/legal/privacy" },
+  { title: "Conditions d'utilisation", href: "/legal/terms" },
+];
 
+export const Footer = () => {
   const navigationItems = [
     {
       title: "Home",
@@ -15,20 +20,12 @@ export const Footer = async () => {
     {
       title: "Pages",
       description: "Managing a small business today is already tough.",
-      items: [
-        {
-          title: "Blog",
-          href: "/blog",
-        },
-      ],
+      items: [],
     },
     {
       title: "Legal",
       description: "We stay on top of the latest legal requirements.",
-      items: legalPages.map((post) => ({
-        title: post._title,
-        href: `/legal/${post._slug}`,
-      })),
+      items: LEGAL_PAGES,
     },
   ];
 

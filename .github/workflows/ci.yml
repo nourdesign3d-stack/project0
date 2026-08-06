@@ -65,10 +65,10 @@ jobs:
       - name: Frontières entre workspaces
         run: pnpm boundaries
 
-      # Build restreint aux apps qui ne dépendent pas d'un service tiers.
-      # Le build complet (apps/web → @repo/cms → BaseHub) est dans le job `build-full`.
-      - name: Build (app, api, email)
-        run: pnpm build --filter=app... --filter=api... --filter=email...
+      # Build **complet** depuis le retrait de BaseHub (D-031) : plus aucune
+      # application ne dépend d'un jeton de service pour se construire.
+      - name: Build (toutes les applications)
+        run: pnpm build
 
   semgrep:
     name: Semgrep
@@ -91,27 +91,6 @@ jobs:
             p/secrets
             p/owasp-top-ten
             .semgrep/rules
-
-  build-full:
-    name: Build complet (services tiers)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Nécessite BASEHUB_TOKEN. À activer via la variable de dépôt ENABLE_FULL_BUILD=true
-    # une fois le secret configuré. Voir docs/DEPLOYMENT.md.
-    if: vars.ENABLE_FULL_BUILD == 'true'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @repo/database run build
-      - name: Build
-        run: pnpm build
-        env:
-          BASEHUB_TOKEN: ${{ secrets.BASEHUB_TOKEN }}
 
   e2e:
     name: Playwright (parcours critiques)

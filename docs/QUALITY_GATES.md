@@ -32,7 +32,6 @@ Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur**, sur tous
 
 | Contrôle | Condition |
 | --- | --- |
-| `pnpm build` (complet) | `BASEHUB_TOKEN` disponible (build de `@repo/cms` requis par `apps/web`) |
 | `pnpm e2e` | une application joignable : soit démarrée à part, soit `E2E_START_SERVER=true` pour que Playwright s'en charge, soit `E2E_BASE_URL` vers une préversion. Scénarios authentifiés ignorés sans identifiants de test (voir ci-dessous) |
 | `pnpm semgrep` | Semgrep installé localement (`brew install semgrep` / `pipx install semgrep`) — toujours disponible en CI |
 

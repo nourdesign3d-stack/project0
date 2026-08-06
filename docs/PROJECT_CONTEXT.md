@@ -19,7 +19,7 @@ Le dépôt contient le squelette technique fonctionnel de next-forge :
 
 - application authentifiée (`apps/app`), site public (`apps/web`), API/webhooks (`apps/api`) ;
 - intégrations câblées mais inertes : Clerk (auth), Stripe (paiement), Neon/Prisma (données),
-  BaseHub (CMS), Resend (e-mail), Knock (notifications), Liveblocks (collaboration),
+  Resend (e-mail), Knock (notifications), Liveblocks (collaboration),
   PostHog/GA (analytics), Nosecone (en-têtes), Upstash (rate limit), Sentry + BetterStack
   (observabilité) ;
 - un seul modèle Prisma : `Page`, stub de démonstration.

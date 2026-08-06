@@ -19,7 +19,6 @@ Aucune donnée métier n'est encore persistée.
 | Identité utilisateur (e-mail, nom, avatar) | Clerk | **personnelle** | ne pas dupliquer en base sans nécessité ni base légale |
 | Appartenance organisation / rôle | Clerk | personnelle | source de vérité des permissions |
 | Moyens de paiement, factures | Stripe | **financière** | ne jamais stocker de numéro de carte |
-| Contenu éditorial du site public | BaseHub | publique | contenu non fiable côté rendu : échapper |
 | Événements produit / analytics | PostHog, GA | pseudonymisée | ne pas y envoyer d'identifiant direct |
 | Erreurs et traces | Sentry | **potentiellement sensible** | filtrer corps de requête, en-têtes, jetons |
 | Journaux applicatifs | BetterStack (si configuré) | potentiellement sensible | ne pas journaliser de donnée personnelle inutile |

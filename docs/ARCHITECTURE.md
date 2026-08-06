@@ -46,7 +46,6 @@ apps/                       packages/
 | `@repo/webhooks` | Svix (webhooks sortants) | serveur |
 | `@repo/notifications` | Knock (in-app + e-mail) | serveur + client |
 | `@repo/email` | Templates react-email + Resend | serveur |
-| `@repo/cms` | BaseHub (contenu du site public) | build + serveur |
 | `@repo/collaboration` | Liveblocks (présence, curseurs) | client + serveur |
 | `@repo/feature-flags` | Flags Vercel + toolbar | build + serveur |
 | `@repo/analytics` | PostHog, Google Analytics | client |
@@ -67,13 +66,12 @@ apps/                       packages/
 2. **Données** — Prisma Client (généré) → adaptateur Neon → Postgres. Accès serveur uniquement.
 3. **Webhooks entrants** — Clerk et Stripe → `apps/api/app/webhooks/*` → vérification de
    signature → traitement.
-4. **Contenu public** — BaseHub → `@repo/cms` → `apps/web` au build et au runtime.
 5. **Observabilité** — erreurs → Sentry (uniquement si `VERCEL` défini) ; logs → BetterStack
    si configuré, sinon console.
 
 ## Dépendances externes
 
-Clerk, Neon (Postgres), Stripe, BaseHub, Resend, Knock, Liveblocks, Upstash,
+Clerk, Neon (Postgres), Stripe, Resend, Knock, Liveblocks, Upstash,
 Svix, PostHog, Sentry, BetterStack, Vercel Blob.
 
 Chacune est un point de défaillance : timeout, retry borné et comportement dégradé
