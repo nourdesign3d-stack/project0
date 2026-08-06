@@ -9,14 +9,14 @@ globs: ["apps/**", "packages/**", "turbo.json", "pnpm-workspace.yaml"]
 
 ```
 apps/app        Next.js 16 — application authentifiée (port 3000)
-apps/web        Next.js 16 — site public + CMS BaseHub (3001)
+apps/web        Next.js 16 — site public, contenu statique (3001)
 apps/api        Next.js 16 — webhooks, cron, health (3002)
 apps/email      react-email — prévisualisation des templates (3003)
 apps/docs       Mintlify — documentation produit (3004)
 apps/studio     Prisma Studio (3005)
 apps/storybook  Catalogue de composants (6006)
 
-packages/       ai, analytics, auth, cms, collaboration, database, design-system,
+packages/       ai, analytics, auth, collaboration, database, design-system,
                 email, feature-flags, internationalization, next-config,
                 notifications, observability, payments, rate-limit, security,
                 seo, storage, typescript-config, webhooks

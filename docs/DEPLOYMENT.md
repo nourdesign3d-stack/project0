@@ -6,16 +6,15 @@
 
 | Job | Contenu | Condition |
 | --- | --- | --- |
-| `quality` | install figé → `prisma generate` → `lint` → `typecheck` → `test` → `test:hooks` → `test:scripts` → `test:launcher` → `boundaries` → build `app` + `api` | toujours |
+| `quality` | install figé → `prisma generate` → `lint` → `typecheck` → `test` → `test:hooks` → `test:scripts` → `test:launcher` → `boundaries` → **build complet** | toujours |
 | `semgrep` | analyse statique de sécurité (conteneur officiel Semgrep) | toujours |
-| `build-full` | `pnpm build` complet (inclut `@repo/cms` et `apps/web`) | `vars.ENABLE_FULL_BUILD == 'true'` **et** secret `BASEHUB_TOKEN` configuré |
 | `e2e` | Postgres éphémère → `migrate:deploy` → Playwright démarre l'app et joue les parcours critiques | `vars.ENABLE_E2E == 'true'` |
 
 Permissions : `contents: read` au niveau du workflow. Aucun job de test n'obtient
 d'autorisation d'écriture.
 
 Pour activer les jobs conditionnels : *Settings → Secrets and variables → Actions →
-Variables* → `ENABLE_FULL_BUILD` / `ENABLE_E2E` = `true`, **après** avoir renseigné les
+Variables* → `ENABLE_E2E` = `true`, **après** avoir renseigné les
 secrets correspondants. Poser la variable d'abord ne rend pas le job vert : il s'exécute
 et échoue.
 
@@ -162,7 +161,7 @@ Sans elles, le démarrage et le build échouent — comportement voulu.
 
 `CLERK_SECRET_KEY` (`sk_…`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_…`),
 `CLERK_WEBHOOK_SECRET` (`whsec_…`), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`BASEHUB_TOKEN`, `RESEND_TOKEN`, `RESEND_FROM`, `SVIX_TOKEN`,
+`RESEND_TOKEN`, `RESEND_FROM`, `SVIX_TOKEN`,
 `LIVEBLOCKS_SECRET`, `KNOCK_*`, `UPSTASH_REDIS_REST_*`, `FLAGS_SECRET`,
 `BETTERSTACK_API_KEY` et `BETTERSTACK_URL` (produit **Uptime**), `BETTER_STACK_SOURCE_TOKEN` et `BETTER_STACK_INGESTING_URL` (**journaux** — noms imposés par `@logtail/next`, D-028), `SENTRY_ORG`, `SENTRY_PROJECT`, `NEXT_PUBLIC_SENTRY_DSN`,
 `NEXT_PUBLIC_POSTHOG_*`, `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
