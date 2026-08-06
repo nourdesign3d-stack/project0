@@ -111,6 +111,54 @@ seul outil de graphe.
 
 ---
 
+## D-032 — Le package IA est gardé, et enfin exécuté
+
+**Date** : 2026-08-05
+**Contexte** : `@repo/ai` n'est importé par aucune application. Après le retrait de BaseHub
+(D-031), la tentation était de le supprimer pour la même raison. **Le rapprochement était
+faux.**
+
+BaseHub coûtait cher parce qu'il **bloquait la chaîne** : sans jeton, `basehub build`
+échouait, donc `apps/web` n'était pas construit en CI. Coût mesuré de `@repo/ai` :
+
+| Mesure | Valeur |
+| --- | --- |
+| Alertes de vulnérabilité attribuables | **zéro** — les 60 viennent de `hono` (32), `undici` (12), `postcss`, `lodash`, `sharp` |
+| Effet sur le build et la CI | **aucun** |
+| Taille | 5 fichiers source |
+
+**Décision** : le garder. Une barre de recherche, un assistant, une classification — le
+besoin est probable, et le coût mesuré est proche de zéro. Le retirer plus tard resterait
+trivial : aucune application ne l'importe, contrairement à BaseHub qui touchait sept
+fichiers.
+
+**Mais le garder inerte n'était pas tenable** : il compile, donc il a l'air de marcher. D-004
+raconte que l'AI SDK v6 avait cassé son API — la correction a été écrite **à l'aveugle**,
+faute de clé OpenAI. C'est exactement le piège dans lequel la graine est tombée cinq fois
+aujourd'hui : Clerk, Neon, Sentry, BetterStack, Stripe.
+
+**Le package est donc éprouvé**, sans compte, sans clé et sans coût : un serveur local
+compatible OpenAI reçoit l'appel. `createOpenAI` se rabat sur `OPENAI_BASE_URL` lorsqu'aucune
+URL n'est passée, ce que fait `lib/models.ts` — la porte était déjà là.
+
+Trois tests : le module produit du texte, il adresse bien `gpt-4o-mini` sur un chemin
+versionné, et il transmet la clé en en-tête `Authorization`. Le troisième a d'abord été
+écrit de travers — son nom annonçait la clé, son assertion comptait les requêtes. Corrigé :
+un test dont le nom ne décrit pas ce qu'il vérifie est pire qu'aucun test.
+
+**Conséquence** : `vitest` devient une dépendance de développement de `packages/ai`, même
+version que partout ailleurs. La tâche `test` de Turborepo le prend en charge sans autre
+changement.
+
+**Ce que cela prouve** : le module se charge, construit un modèle, émet une requête conforme
+et sait lire la réponse — donc les correctifs de D-004 tiennent à l'exécution.
+**Ce que cela ne prouve pas** : qu'OpenAI accepte cet appel. Comme pour BetterStack, on
+constate ce qui part et sa forme, pas ce que le fournisseur en fait.
+
+Ce test attrapera la prochaine dérive du SDK, qui viendra.
+
+---
+
 ## D-031 — BaseHub retiré, pages légales écrites en dur
 
 **Date** : 2026-08-05
