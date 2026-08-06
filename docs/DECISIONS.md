@@ -111,6 +111,55 @@ seul outil de graphe.
 
 ---
 
+## D-033 — Le contrôle d'autorisation vit dans la route, pas dans le layout
+
+**Date** : 2026-08-06
+**Contexte** : un audit externe a démontré que le « plancher » de D-024 ne tenait pas.
+
+**Ce qui a été constaté** — reproduit et confirmé :
+
+| Cas | Test statique | Réalité |
+| --- | --- | --- |
+| `route.ts` **sans aucun contrôle** sous `(authenticated)` | **3/3 verts** | `200` à un appel anonyme, `userId: null` |
+| `auth()` retiré de `search/page.tsx` | **3/3 verts** | — |
+
+**La cause** : `isProtected` remontait les `layout.tsx` parents. Comme
+`(authenticated)/layout.tsx` appelle `currentUser()`, **toute** route sous ce groupe était
+réputée protégée, quel que soit son contenu.
+
+Deux erreurs distinctes dans cette remontée :
+
+1. Un **route handler n'exécute jamais de layout**. Les layouts appartiennent au rendu
+   React, pas au traitement d'une requête HTTP. Le crédit était purement imaginaire.
+2. Même pour une **page**, un layout n'est pas une autorisation : Next évalue pages et
+   layouts **en parallèle**, donc une lecture de données peut partir avant la redirection.
+   `.claude/rules/security.md` le disait déjà — « au plus près de l'accès aux données » —
+   et le commentaire de `(authenticated)/page.tsx` l'expliquait mot pour mot. Le test ne
+   faisait pas respecter la règle que le dépôt s'était donnée.
+
+**Décision** : le contrôle doit se trouver **dans le fichier de la route**. Aucun crédit
+hérité, ni pour une page, ni pour un route handler.
+
+**Conséquence immédiate** : `(authenticated)/webhooks/page.tsx` n'avait aucun contrôle et
+appelait Svix (`getAppPortal`) en s'appuyant sur le layout. Un contrôle `orgId` y a été
+ajouté — c'était un défaut réel, pas une formalité de test.
+
+**Second angle mort, même famille** : `toUrlPath` retirait les segments dynamiques.
+`(authenticated)/items/[id]/page.tsx` devenait `/items`, une URL inexistante ; Playwright
+recevait un `404`, que la liste des refus acceptait. Le test passait au vert **sans avoir
+touché la route**. Sur une application multi-tenant, la ressource identifiée par un
+paramètre est justement celle qu'il faut contrôler.
+
+`toUrlPath` renvoie désormais `null` pour une route dynamique, et un test dédié **échoue**
+en les nommant : fournir une valeur d'exemple, ou assumer explicitement l'absence de
+contrôle d'exécution. Le silence n'est plus une option.
+
+**Ce que cet épisode enseigne** : le contrôle, son test, et l'idée derrière les deux
+venaient de la même personne. Le test confirmait l'intention au lieu d'éprouver le
+comportement. C'est le motif commun des trois constats les plus graves de cet audit.
+
+---
+
 ## D-032 — Le package IA est gardé, et enfin exécuté
 
 **Date** : 2026-08-05
