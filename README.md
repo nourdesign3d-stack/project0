@@ -54,10 +54,14 @@ Détail des responsabilités : [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Intégrations fournies par le template
 
-Clerk (authentification), Prisma + Neon (données), Stripe (paiement), BaseHub (CMS),
-Resend (e-mail), Knock (notifications), Liveblocks (collaboration), PostHog / Google
-Analytics, Nosecone (en-têtes de sécurité), Upstash (limitation de débit), Svix (webhooks
-sortants), Sentry + BetterStack (observabilité), Vercel Blob (stockage).
+Clerk (authentification), Prisma + Neon (données), Stripe (paiement), Resend (e-mail),
+Knock (notifications), Liveblocks (collaboration), PostHog / Google Analytics, Nosecone
+(en-têtes de sécurité), Upstash (limitation de débit), Svix (webhooks sortants),
+Sentry + BetterStack (observabilité), Vercel Blob (stockage), OpenAI via l'AI SDK.
+
+BaseHub (CMS) a été retiré : le site public sert désormais des pages écrites en dur
+(D-031). Arcjet aussi (D-014). Chaque service conservé est une surface d'attaque et un
+coût — l'arbitrage reste ouvert (R-009).
 
 Toutes sont **câblées mais inertes** tant que leurs clés ne sont pas fournies.
 

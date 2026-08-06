@@ -550,9 +550,9 @@ say(`
 
   Ce qui reste relève de décisions, pas de commandes :
 
-    1. Quelles intégrations supprimer ? Une quinzaine de services sont
+    1. Quelles intégrations supprimer ? Plusieurs services restent
        câblés et inertes ; chacun gardé est une surface d'attaque et un
-       coût. (risque R-007)
+       coût. (risque R-009)
 
     2. Remplacer le stub Prisma \`Page\` par le premier vrai modèle,
        puis : pnpm migrate --name <nom>
