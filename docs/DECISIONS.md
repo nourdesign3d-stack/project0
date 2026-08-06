@@ -111,6 +111,56 @@ seul outil de graphe.
 
 ---
 
+## D-036 — Le garde-fou Bash réparé : six défauts, aucun n'exigeait d'obscurcissement
+
+**Date** : 2026-08-06
+**Contexte** : R-016 classait ce garde-fou en « accepté », au motif qu'un contournement
+demandait un **obscurcissement déterminé** — encodage, chaîne construite. Un audit externe
+a envoyé 34 formulations : **29 sont passées**, et aucune n'était obscurcie.
+
+**Les six défauts, et ce qu'ils avaient en commun** :
+
+| Défaut | Ce qui passait |
+| --- | --- |
+| Tout jeton entre guillemets était ignoré | `rm "-rf" /chemin`, `git "push" "--force"`, `docker compose down "-v"` |
+| Seuls les chemins **absolus** comptaient pour le bac à sable | `rm -rf /tmp/keep ~/Documents` |
+| Le corps de heredoc était effacé **depuis le `<<`** | `cat <<'EOF' && rm -rf /x` — la commande disparaissait de l'analyse |
+| `(` et `{` n'étaient pas des séparateurs | `(rm -rf /x)` devenait le jeton `(rm` |
+| Lecteurs manquants | `hexdump`, `openssl`, `rev`, `split`, `shasum`, `ditto` |
+| Destructions manquantes | `shred`, `truncate -s 0` |
+
+Le cas du heredoc est le pire : le garde-fou ne **ratait** pas la commande, il l'**effaçait
+de sa propre vue** puis répondait « autorisé ». Un garde-fou qui se rend aveugle et
+l'affirme est pire que pas de garde-fou.
+
+**Les corrections** :
+
+Le critère « entre guillemets » est remplacé par le critère **espacement**. Les guillemets
+avaient été écartés pour qu'un message de commit parlant de `rm -rf` ne déclenche rien —
+l'intention était bonne, le critère mauvais. Un argument réel ne contient pas d'espace ;
+une phrase en contient toujours. `"-rf"` compte, `"docs: git push --force"` reste du texte.
+
+Le bac à sable considère désormais **tous** les arguments non-drapeaux, après expansion du
+`~` et résolution depuis le dossier courant. Un seul chemin hors zone réarme la règle.
+
+Le corps de heredoc ne commence qu'à la **ligne suivante** : la fin de la ligne d'ouverture
+est conservée et analysée. Les groupes deviennent des séparateurs d'invocation.
+
+**La suite de tests passe de 85 à 113 cas.** C'est le vrai enseignement : les 85 cas
+précédents ne contenaient **aucun** drapeau entre guillemets. Ils éprouvaient ce que
+l'auteur avait déjà en tête — le contrôle et son test venaient de la même idée.
+
+**Un cas de test écrit de travers, corrigé** : j'avais inscrit `rm -rf ~/../../tmp/hors-zone`
+comme devant être refusé. Il est légitimement autorisé — ce chemin résout dans le
+temporaire. Le garde-fou avait raison, mon attente était fausse.
+
+**La limite est requalifiée, pas supprimée.** Ce n'est toujours pas une frontière de
+sécurité : un encodage, une variable construite à l'exécution ou un interpréteur tiers
+passeront. Mais R-016 ne peut plus dire « il faut être déterminé » — c'était faux, et
+`rm -rf /tmp/x ~/Documents` est une frappe ordinaire, pas une attaque.
+
+---
+
 ## D-032 — Le package IA est gardé, et enfin exécuté
 
 **Date** : 2026-08-05
