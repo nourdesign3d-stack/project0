@@ -69,6 +69,24 @@ const password = process.env.E2E_USER_PASSWORD;
 const otp = process.env.E2E_USER_OTP;
 
 test.describe("parcours authentifié", () => {
+  /**
+   * ⚠️ Aucun artefact pour ce parcours — et pour lui seul.
+   *
+   * Une trace Playwright enregistre les en-têtes **et les corps** des requêtes :
+   * elle contient donc le `POST` de connexion, avec le mot de passe du compte de
+   * test, et le `Set-Cookie` de session. La vidéo et les captures montrent le
+   * code de vérification, saisi dans un champ texte ordinaire — pas un champ
+   * masqué.
+   *
+   * Ces artefacts sont téléversés par la CI, et **GitHub ne caviarde jamais le
+   * contenu d'un artefact** : il ne masque que les journaux. Tout collaborateur
+   * du dépôt pouvait les télécharger. Relevé en audit le 2026-08-06 (D-037).
+   *
+   * Les autres parcours conservent trace, vidéo et captures : ils n'émettent que
+   * des requêtes anonymes, et ce sont eux qui servent au diagnostic.
+   */
+  test.use({ trace: "off", video: "off", screenshot: "off" });
+
   test.skip(
     !(email && password),
     "E2E_USER_EMAIL / E2E_USER_PASSWORD non fournis — parcours authentifié non couvert"
