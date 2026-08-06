@@ -267,7 +267,7 @@ out.write(`
        d'authentification ne s'affichent pas. Voir docs/DEPLOYMENT.md.
 
     6. Décisions de fond, à ne pas repousser :
-         - quelles intégrations supprimer (≈15 services câblés, risque R-007) ;
+         - quelles intégrations supprimer (services câblés mais inertes, R-009) ;
          - remplacer le stub Prisma \`Page\` par le vrai modèle ;
          - remplir docs/PROJECT_CONTEXT.md et docs/DOMAIN_MODEL.md sans inventer ;
          - relire ARCHITECTURE, SECURITY_MODEL, QUALITY_GATES et DEPLOYMENT :
