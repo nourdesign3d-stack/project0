@@ -111,6 +111,49 @@ seul outil de graphe.
 
 ---
 
+## D-039 — Deux promesses que le code ne tenait pas
+
+**Date** : 2026-08-06
+**Contexte** : deux commentaires annonçaient une protection que leur code n'appliquait pas.
+Ce ne sont pas des oublis de documentation : ce sont des **fausses assurances**, et elles
+coûtent plus qu'un silence.
+
+### Le webhook Stripe lisait le corps avant de vérifier l'en-tête
+
+`await request.text()` précédait le contrôle de `stripe-signature`. Un appelant anonyme
+faisait donc mettre en mémoire la totalité de sa charge utile **avant** qu'on ne découvre
+qu'il n'avait produit aucune signature.
+
+Sur une route publique, sans pare-feu ni limitation de débit (R-003), c'est le vecteur
+d'épuisement mémoire le moins coûteux du dépôt : aucun secret à deviner, aucun compte à
+créer. Le webhook Clerk faisait déjà l'inverse — il refuse avant de bufferiser.
+
+Les deux lignes sont permutées. Un test le constate en piégeant `request.text()` : le
+consommer avant le contrôle fait échouer le test. Vu échouer après rétablissement de
+l'ordre fautif.
+
+### `db:restore` ne demandait pas la confirmation qu'il revendiquait
+
+Son en-tête disait : « une restauration lancée par inadvertance dans un `&&` est exactement
+le scénario à empêcher ». Il ne l'empêchait pas. `--yes` était lu dans le **même `argv`**
+que `--to database-url` : une seule ligne collée restaurait une base distante — donc
+potentiellement la production — sans second geste humain.
+
+La confirmation dépend désormais de la cible. `--to local`, qui vise le conteneur de
+répétition, se contente de `--yes`. `--to database-url` exige de **saisir le nom de la
+base** au terminal, et refuse tout net hors terminal : un enchaînement automatisé ne doit
+pas pouvoir remplacer une base distante.
+
+Le nom se recopie, il ne se colle pas par inadvertance — et l'écrire oblige à regarder la
+cible affichée juste au-dessus. Le mécanisme existait déjà ailleurs dans le dépôt
+(`set-env.mjs`) ; il manquait là où il comptait le plus.
+
+**Ce que ces deux cas ont en commun** : un commentaire décrivait l'intention, et personne
+n'avait vérifié que le code la servait. C'est la même famille que le garde-fou Bash (D-036)
+et que les en-têtes de sécurité (D-034) — une affirmation écrite une fois, jamais éprouvée.
+
+---
+
 ## D-032 — Le package IA est gardé, et enfin exécuté
 
 **Date** : 2026-08-05

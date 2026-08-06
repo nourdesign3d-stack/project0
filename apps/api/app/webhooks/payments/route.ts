@@ -111,14 +111,21 @@ export const POST = async (request: Request): Promise<Response> => {
     return NextResponse.json({ ok: false }, { status: 503 });
   }
 
-  // Corps brut : une re-sérialisation invaliderait la signature.
-  const body = await request.text();
+  // ⚠️ L'en-tête est contrôlé **avant** de lire le corps. L'ordre inverse
+  // mettait en mémoire la totalité de la charge utile d'un appelant anonyme
+  // avant de découvrir qu'il n'avait produit aucune signature — le vecteur
+  // d'épuisement mémoire le moins coûteux du dépôt, sur une route publique sans
+  // pare-feu ni limitation de débit (R-003). Le webhook Clerk faisait déjà
+  // l'inverse. Relevé en audit le 2026-08-06 (D-039).
   const headerPayload = await headers();
   const signature = headerPayload.get("stripe-signature");
 
   if (!signature) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
+
+  // Corps brut : une re-sérialisation invaliderait la signature.
+  const body = await request.text();
 
   let event: Stripe.Event;
 

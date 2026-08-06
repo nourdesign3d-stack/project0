@@ -12,9 +12,14 @@
  *     c'est-à-dire potentiellement la base de production. Aucune valeur par
  *     défaut : se tromper de cible ici, c'est écraser ce qu'on voulait sauver.
  *
- *  2. **`--yes` est obligatoire.** Le script affiche l'hôte et la base visés,
- *     puis exige une confirmation explicite. Une restauration lancée par
- *     inadvertance dans un `&&` est exactement le scénario à empêcher.
+ *  2. **La confirmation dépend de la cible.** `--to local` se contente de
+ *     `--yes`. `--to database-url` exige en plus de **saisir le nom de la base**
+ *     au terminal, et refuse tout net hors terminal.
+ *
+ *     `--yes` seul ne suffisait pas : lu dans le même `argv` que la cible, il
+ *     laissait une ligne collée restaurer une base distante sans second geste
+ *     humain — le scénario que cet en-tête prétendait empêcher. Relevé en audit
+ *     le 2026-08-06 (D-039).
  *
  * La répétition sérieuse consiste à restaurer **ailleurs** que sur la source :
  * `--to local` depuis une sauvegarde de production prouve la sauvegarde sans
@@ -23,6 +28,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
+import { createInterface } from "node:readline";
 import { databaseUrl, describe, runInContainer } from "./lib/database-url.mjs";
 
 const out = process.stdout;
@@ -73,6 +79,48 @@ if (!confirmed) {
   say("  Vérifier la cible ci-dessus avant de le faire.");
   say("");
   process.exit(1);
+}
+
+/**
+ * Pour la cible `database-url` — celle qui peut désigner la production — `--yes`
+ * ne suffit pas.
+ *
+ * ⚠️ L'en-tête de ce script annonçait « le scénario à empêcher est un `&&` ».
+ * Il ne l'empêchait pas : `--yes` était lu dans le **même `argv`** que
+ * `--to database-url`, donc une seule ligne collée restaurait sans second geste
+ * humain. Relevé en audit le 2026-08-06 (D-039).
+ *
+ * L'opérateur doit désormais **saisir le nom de la base** au terminal. Un nom
+ * qu'on recopie ne se colle pas par inadvertance, et l'écrire oblige à regarder
+ * la cible affichée juste au-dessus.
+ */
+if (destination === "database-url") {
+  if (!process.stdin.isTTY) {
+    say("  Cible database-url : confirmation interactive obligatoire.");
+    say("  Ce script refuse de restaurer une base distante sans terminal —");
+    say("  un enchaînement automatisé ne doit pas pouvoir la remplacer.");
+    say("");
+    process.exit(1);
+  }
+
+  const expected = describe(url).split("/").pop() ?? "";
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  const answer = await new Promise((resolve) => {
+    rl.question(
+      `  Saisir le nom de la base pour confirmer (${expected}) : `,
+      resolve
+    );
+  });
+
+  rl.close();
+
+  if (answer.trim() !== expected) {
+    say("");
+    say("  Nom incorrect : rien n'a été fait.");
+    say("");
+    process.exit(1);
+  }
 }
 
 try {
