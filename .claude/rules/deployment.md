@@ -11,7 +11,7 @@ Chaîne exécutée sur `push` et `pull_request` :
 
 ```
 setup (pnpm + cache) → prisma generate → lint → typecheck → test
-  → test:hooks → test:scripts → test:launcher → boundaries → build (app, api) → semgrep
+  → test:hooks → test:scripts → test:launcher → boundaries → build (complet) → semgrep
 ```
 
 - Les jobs utilisent `pnpm install --frozen-lockfile` : le lockfile fait foi.
@@ -19,10 +19,9 @@ setup (pnpm + cache) → prisma generate → lint → typecheck → test
 - Actions tierces épinglées au **SHA de commit**, version en commentaire (D-009).
 - **Aucun `|| true`**, aucune étape masquant un échec. Une étape non bloquante doit être
   nommée `(informatif)` et justifiée dans ce fichier.
-- Le job E2E Playwright et le build complet (`apps/web`, `@repo/cms`) dépendent de secrets
-  externes : ils ne s'activent que si la variable de dépôt correspondante est positionnée
-  (`ENABLE_E2E`, `ENABLE_FULL_BUILD`). Cette conditionnalité est un choix explicite, pas un
-  contournement.
+- Le build est **complet** depuis le retrait de BaseHub (D-031) : aucune application ne
+  dépend d'un jeton de service pour se construire. Seul le job E2E Playwright reste
+  conditionnel (`ENABLE_E2E`), faute de pouvoir versionner des identifiants de test.
 
 ## Environnements
 

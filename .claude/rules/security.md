@@ -53,8 +53,7 @@ Tester les deux chemins : succès **et** refus (401/403/404 selon le cas).
 - `.env.example` documente les variables **sans valeur**. `.env.local` n'est jamais versionné.
 - Ne jamais afficher le contenu d'un fichier d'environnement (interdit par
   `.claude/settings.json`).
-- Les clés de services tiers sont scopées au minimum nécessaire (clé Stripe restreinte,
-  jeton BaseHub en lecture seule, etc.) : le périmètre se restreint par la clé, pas
+- Les clés de services tiers sont scopées au minimum nécessaire (clé Stripe restreinte, etc.) : le périmètre se restreint par la clé, pas
   seulement par le code.
 
 ## Abus et ressources

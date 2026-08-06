@@ -33,7 +33,6 @@ résultat de test, de build ou de scan.
 | Typecheck | `pnpm typecheck` |
 | Tests unitaires / intégration | `pnpm test` |
 | Build | `pnpm build` |
-| Build sans services tiers | `pnpm build --filter=app... --filter=api...` |
 | Tests E2E Playwright | `pnpm e2e` (navigateurs : `pnpm e2e:install`) |
 | Analyse de sécurité | `pnpm semgrep` |
 | Chaîne complète locale | `pnpm verify` |
@@ -59,8 +58,8 @@ Ports : `app` 3000, `web` 3001, `api` 3002, `email` 3003, `docs` 3004, `studio` 
 
 ### Limites connues des commandes
 
-- `pnpm build` complet nécessite `BASEHUB_TOKEN` (build de `@repo/cms`, requis par `apps/web`).
-  Sans ce jeton, utiliser le filtre `--filter=app... --filter=api...`.
+- `pnpm build` construit **toutes** les applications sans aucun jeton de service depuis le
+  retrait de BaseHub (D-031).
 - Les apps exigent `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_WEB_URL` (les
   autres variables sont optionnelles). Une variable optionnelle laissée à `""` **échoue**
   la validation Zod : la commenter plutôt que la laisser vide.

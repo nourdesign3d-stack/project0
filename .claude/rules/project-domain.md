@@ -14,7 +14,7 @@ globs: ["apps/app/app/**", "packages/database/prisma/**"]
   organisations**. L'isolation entre organisations est donc un invariant structurant
   dès la première fonctionnalité métier.
 - Les briques disponibles (paiement Stripe, notifications Knock, collaboration Liveblocks,
-  CMS BaseHub, e-mail Resend) sont **câblées mais pas utilisées** par une logique métier.
+  e-mail Resend) sont **câblées mais pas utilisées** par une logique métier.
 
 ## Ce qui n'est pas établi
 
