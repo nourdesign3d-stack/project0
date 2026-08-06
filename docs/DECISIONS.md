@@ -111,6 +111,59 @@ seul outil de graphe.
 
 ---
 
+## D-038 — Configurations mortes : les retirer, ou les rendre structurelles
+
+**Date** : 2026-08-06
+**Contexte** : un audit externe a relevé huit configurations qui ne faisaient rien, ou qui
+décrivaient un état révolu. Prises une à une, elles sont mineures. Prises ensemble, elles
+forment un motif : **du texte que personne n'exécute finit par mentir**.
+
+**Une procédure qui aurait égaré un agent.**
+`.claude/skills/release-readiness/SKILL.md` affirmait que le build complet nécessite
+`BASEHUB_TOKEN`. C'est une procédure qu'un agent **suit** au moment d'une livraison : elle
+l'aurait envoyé chercher un jeton supprimé depuis D-031. `README.md` portait la même
+affirmation, contredite vingt et une lignes plus bas. La PR #29 prétendait avoir corrigé
+les références périmées et avait manqué celle-ci.
+
+**Deux fichiers de configuration pointant vers un fichier supprimé** :
+`biome.jsonc` et `.semgrepignore` référençaient `packages/cms/basehub-types.d.ts`.
+
+**Un `overrides` silencieusement ignoré.** `package.json` en portait un sur `parse5`, au
+format npm — que **pnpm ne lit pas**. Deux versions coexistaient malgré lui (7.3.0 et
+8.0.1), ce qu'un override effectif interdit. Retiré plutôt que déplacé : `parse5` ne figure
+dans aucune alerte, et forcer une version sans besoin mesuré est une contrainte gratuite.
+Un avertissement dans `pnpm-workspace.yaml` empêche d'en réintroduire un au mauvais
+endroit.
+
+**Une sortie de cache qui ne correspondait à rien.** `turbo.json` déclarait `.react-email/**`
+alors que `apps/email` écrit dans `.cache/export` — le cache de ce workspace ne restituait
+donc jamais rien.
+
+**Trois contrôles, une seule hypothèse de nommage.** `.env.staging` échappait
+simultanément à `.gitignore`, au `deny` de `.claude/settings.json` et aux `SECRET_PATHS` du
+garde-fou : les trois énuméraient des suffixes. Deux sont désormais **structurels** —
+`.gitignore` ignore `.env.*` en préservant l'exemple par négation, et le garde-fou couvre
+toute variante, `.env.example` étant écarté explicitement.
+
+Le troisième reste une énumération, et c'est une limite assumée : le langage de motifs de
+`settings.json` **ne sait pas exprimer une exception**. Un `Read(**/.env.*)` bloquait aussi
+`.env.example`, fichier versionné et légitimement lisible — je l'ai constaté en me
+l'interdisant à moi-même dans la foulée. La liste couvre donc les noms réalistes, et la
+protection de fond vit dans le garde-fou, qui s'applique à toute commande.
+
+**Deux variables documentées que personne ne lit.** `KNOCK_API_KEY` et
+`KNOCK_FEED_CHANNEL_ID` figuraient dans les trois `.env.example` ; `packages/notifications`
+lit `KNOCK_SECRET_API_KEY`, `NEXT_PUBLIC_KNOCK_API_KEY` et
+`NEXT_PUBLIC_KNOCK_FEED_CHANNEL_ID`. Exactement le défaut de D-028 pour BetterStack, sur un
+autre service. Les noms morts sont retirés, et seule `apps/app` — la seule à utiliser le
+package — conserve les vrais.
+
+**Un resserrement assumé** : l'élargissement des `SECRET_PATHS` fait désormais refuser
+`cp .env.example .env.local.tmp`. La destination contiendra du contenu d'environnement ;
+l'attente inverse figurait dans la suite de tests, elle est corrigée. 87 cas.
+
+---
+
 ## D-032 — Le package IA est gardé, et enfin exécuté
 
 **Date** : 2026-08-05

@@ -126,7 +126,13 @@ const cases = [
   ["pnpm typecheck && pnpm test", "autorisé"],
   ["cat package.json", "autorisé"],
   ["cat apps/app/.env.example", "autorisé"],
-  ["cp apps/app/.env.example apps/app/.env.local.tmp", "autorisé"],
+  // Depuis l'élargissement de SECRET_PATHS à toute variante de `.env` (D-038),
+  // une destination `.env.local.tmp` est elle aussi traitée comme un fichier de
+  // secrets : elle en contiendra. Resserrement assumé — l'attente inverse était
+  // écrite ici avant.
+  ["cp apps/app/.env.example apps/app/.env.local.tmp", "refusé"],
+  ["cat apps/app/.env.staging", "refusé"],
+  ["cat apps/app/.env.preview", "refusé"],
   ["rg DATABASE_URL packages", "autorisé"],
   ["find . -name '*.test.ts'", "autorisé"],
   ["git status --short", "autorisé"],

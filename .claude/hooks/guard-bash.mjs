@@ -36,8 +36,11 @@ import { isAbsolute, resolve } from "node:path";
 import { parseCommand, resolveInvocation } from "./lib/shell-tokens.mjs";
 
 const SECRET_PATHS = [
-  /(^|\/)\.env(\.local|\.production|\.development|\.test)?$/,
-  /(^|\/)\.env\.[a-z]+\.local$/,
+  // Toute variante de `.env`, quel qu'en soit le suffixe. Énumérer
+  // `local|production|development|test` laissait passer `.env.staging`,
+  // `.env.preview` et tout nom non anticipé — relevé en audit le 2026-08-06.
+  // `.env.example` est écarté séparément, dans `isSecretPath`.
+  /(^|\/)\.env(\.[\w.-]+)?$/,
   /\.ssh\//,
   /\.aws\/(credentials|config)$/,
   /id_rsa/,
