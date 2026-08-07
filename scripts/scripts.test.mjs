@@ -577,6 +577,29 @@ cases.push({
 });
 
 cases.push({
+  name: "db:restore : --yes ne suffit pas pour une base distante",
+  run: (root) => {
+    // `--yes` était lu dans le même argv que `--to database-url` : une ligne
+    // collée restaurait sans second geste humain — précisément ce que l'en-tête
+    // du script prétendait empêcher. Hors terminal, le refus doit être net.
+    writeFileSync(join(root, "sauvegarde.dump"), "factice");
+
+    const { status, output } = runScript(
+      root,
+      "db-restore.mjs",
+      ["sauvegarde.dump", "--to", "database-url", "--yes"],
+      { DATABASE_URL: "postgresql://u:p@ailleurs.example/production" }
+    );
+
+    assert(status === 1, "une base distante a été restaurée sans terminal");
+    assert(
+      output.includes("interactive"),
+      "le refus n'explique pas qu'une confirmation au terminal est exigée"
+    );
+  },
+});
+
+cases.push({
   name: "db:backup : refuse d'écraser une sauvegarde existante",
   run: (root) => {
     // Écraser une sauvegarde est la meilleure façon de n'en avoir aucune.

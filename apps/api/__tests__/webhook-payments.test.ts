@@ -133,6 +133,41 @@ describe("webhook Stripe", () => {
     expect(response.status).toBe(400);
   });
 
+  test("ne lit pas le corps avant d'avoir vu la signature", async () => {
+    // Sur une route publique sans pare-feu ni limitation de débit (R-003), lire
+    // la charge utile d'un appelant anonyme avant de constater qu'il n'a produit
+    // aucune signature est le vecteur d'épuisement mémoire le moins coûteux du
+    // dépôt. Le corps est ici un piège : le consommer fait échouer le test.
+    requestHeaders = {};
+
+    let consumed = false;
+
+    const request = new Request("http://localhost/webhooks/payments", {
+      method: "POST",
+      body: "charge utile",
+    });
+
+    const trapped = new Proxy(request, {
+      get(target, property, receiver) {
+        if (property === "text") {
+          consumed = true;
+        }
+
+        const value = Reflect.get(target, property, receiver);
+
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    const { POST } = await import("../app/webhooks/payments/route");
+    const response = await POST(trapped);
+
+    expect(response.status).toBe(400);
+    expect(consumed, "le corps a été lu avant le contrôle de signature").toBe(
+      false
+    );
+  });
+
   test("refuse une signature forgée", async () => {
     const body = event("checkout.session.completed", { customer: "cus_1" });
 
