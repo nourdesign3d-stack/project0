@@ -253,6 +253,122 @@ inscrite dans `RISKS.md` et déclarée aux personnes concernées — pas un déf
 Les deux gestionnaires portaient le même bloc **dupliqué** : un seul `publicProperties`
 les sert désormais, et un test couvre les deux chemins — corriger l'un en oubliant
 l'autre aurait laissé la fuite ouverte sur le plus fréquent.
+## D-042 — Le premier geste prescrit au repreneur ne fonctionnait pas
+
+**Date** : 2026-08-07
+**Contexte** : le bloc « Démarrer » du README prescrivait
+`cp apps/app/.env.example apps/app/.env.local` — alors que **le README lui-même**
+expliquait deux lignes plus bas qu'une variable optionnelle laissée à `""` échoue la
+validation Zod. Il omettait aussi la génération du client Prisma, que `pnpm install`
+ne déclenche pas.
+
+Un dépôt destiné à être **cloné** ne peut pas se permettre cela : c'est la première
+chose que fait celui qui arrive, et l'erreur obtenue ne désigne pas sa cause.
+
+**Mesuré sur un clone vierge**, pas déduit. Après `git clone` puis `pnpm install` :
+
+```
+app/(authenticated)/page.tsx(51,23): error TS7006: Parameter 'page' implicitly has an 'any' type.
+app/(authenticated)/search/page.tsx(59,23): error TS7006: …
+../../packages/database/index.ts(4,30): error TS2307: Cannot find module './generated/client'
+../../packages/database/index.ts(32,15): error TS2307: Cannot find module './generated/client'
+```
+
+Après `pnpm --filter @repo/database run build` : typecheck propre, sans autre
+changement.
+
+**Ce qui est corrigé.** Le bloc prescrit désormais `pnpm env:setup` — qui commente les
+valeurs vides et renseigne `DATABASE_URL` — la génération du client Prisma, et
+`pnpm migrate`. Chaque étape non évidente est justifiée à côté de la commande, parce
+qu'une recette sans raison se fait contourner à la première contrariété.
+`pnpm hooks:install` sort du bloc : il tourne déjà à l'installation.
+
+Corrigé au passage : `setup-env.mjs` citait **BaseHub** parmi les services à
+configurer, retiré depuis (D-031).
+
+**Rendu exécutoire.** `apps/api/__tests__/onboarding.test.ts` lit le bloc « Démarrer »
+du vrai README et exige qu'il prescrive `env:setup` et la génération Prisma, et qu'il
+ne prescrive **pas** de copie d'un `.env.example`. Vu échouer sur le README d'avant
+(`2 failed | 1 passed`). Le test ne rejoue pas l'installation — trop lente pour la
+chaîne courante ; il garde ce qui a été prouvé une fois.
+
+---
+
+## D-041 — La libération d'une réservation avalait toute erreur
+
+**Date** : 2026-08-07
+**Contexte** : `releaseEvent` se terminait par `.catch(() => undefined)`. Toute erreur
+de suppression — base injoignable, délai dépassé — disparaissait sans trace.
+
+Or **l'échec de cette fonction produit précisément la perte qu'elle existe pour
+empêcher**. Enchaînement complet : le traitement du webhook échoue, la libération
+échoue aussi, la réservation survit ; le fournisseur réessaie, la réservation le fait
+passer pour un doublon, et l'événement est acquitté sans avoir jamais été traité. Le
+fournisseur, lui, a vu un `200` : il ne réessaiera plus.
+
+Aucun dispositif du système ne peut le signaler — ni métrique, ni alerte, ni contrôle
+de santé. C'est ce que l'audit du 2026-08-07 a nommé la perte silencieuse d'un
+événement de paiement.
+
+**Deux cas, désormais distingués.** `P2025` — la ligne n'existe pas — est sans
+conséquence et attendu si deux chemins libèrent le même événement : ignoré. Tout le
+reste est **journalisé avec le fournisseur et l'identifiant d'événement**, les deux
+seuls éléments permettant de retrouver ce qui a été perdu chez le fournisseur et de le
+rejouer à la main.
+
+L'erreur n'est pas propagée : l'appelant est déjà dans son chemin d'échec, et la
+masquer d'une seconde erreur ne l'aiderait pas.
+
+**Preuve.** Deux tests : l'un exige que le journal porte `stripe` et `evt_1` quand la
+suppression échoue — vu échouer sur le code d'avant (`1 failed | 15 passed`) ; l'autre
+exige le silence sur `P2025`, pour que la correction ne devienne pas du bruit.
+
+**Ce que ce défaut enseigne** : `.catch(() => undefined)` est la forme la plus compacte
+d'un renoncement. Ici il occupait une ligne, sous un commentaire de quatre lignes
+expliquant que perdre un événement en silence était « exactement ce que l'idempotence
+est censée éviter ». Même famille que D-039.
+
+---
+
+## D-040 — Le garde-fou Bash se désarmait tout seul sous /tmp
+
+**Date** : 2026-08-07
+**Contexte** : D-036 corrigeait six défauts du garde-fou. L'un d'eux — l'exemption
+du bac à sable temporaire ne voyant que les chemins **absolus** — a été réparé en
+résolvant chaque argument depuis le dossier courant. **Cette correction en a créé une
+bien pire.**
+
+Résoudre depuis le dossier courant rend l'exemption **contagieuse**. Dès que le dépôt
+lui-même vit sous `/tmp` ou `$TMPDIR` — un clone d'audit, un bac à sable d'agent, un
+`mktemp -d` — tout argument relatif résout en zone temporaire, et **la totalité des
+règles saute**. Y compris celles qui n'ont aucun rapport avec un chemin :
+`git push --force`, `prisma db push`, `docker system prune`, `vercel env pull`.
+
+C'est le contournement le plus large que ce garde-fou ait connu, et il ne demandait
+aucun obscurcissement : il suffisait de travailler au mauvais endroit. Relevé en audit
+le 2026-08-07 — par un auditeur qui travaillait précisément dans un clone temporaire.
+
+**Deux corrections, parce qu'il y avait deux erreurs de raisonnement.**
+
+*Un chemin doit être absolu par lui-même.* Le dossier courant n'entre plus dans la
+décision : c'est ce qui rend le verdict indépendant de l'endroit où le dépôt est cloné.
+Un chemin relatif désigne ce que contient le dossier courant — c'est-à-dire le dépôt —
+et n'a jamais prouvé qu'on visait un bac à sable.
+
+*L'exemption ne s'offre qu'aux règles qui portent sur des chemins.* Elles sont marquées
+`sandboxable` : `rm`, `find`, `shred`, `truncate`. Les autres ne la reçoivent jamais.
+Rien dans `git push --force origin main` n'est un chemin ; l'exempter parce que le
+dossier courant est temporaire n'avait aucun sens.
+
+**Preuve.** 15 cas rejouent des commandes **depuis un dossier temporaire**, le harnais
+de test acceptant désormais un dossier d'exécution. Sur le code d'avant : `11 écart(s)
+sur 130 cas`. Après : `130 cas vérifiés, aucun écart`.
+
+**Ce que ce défaut enseigne**, et qui dépasse ce fichier : la correction de D-036 avait
+été validée par des tests **tous lancés depuis la racine du dépôt**. Un harnais qui
+n'exerce qu'un seul contexte d'exécution ne peut pas voir un défaut qui dépend du
+contexte d'exécution. C'est le pendant exact de D-039 — sauf qu'ici, ce n'est pas un
+commentaire qui promettait à tort, c'est un test.
 
 ---
 
