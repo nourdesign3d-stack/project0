@@ -682,6 +682,74 @@ check("db:backup : une URL illisible est laissée telle quelle", async () => {
   );
 });
 
+check("rétention : les 30 derniers jours sont tous conservés", async () => {
+  const { applyRetention } = await import("./lib/retention.mjs");
+  const now = new Date("2026-08-07T12:00:00Z");
+  const backups = [0, 1, 5, 15, 29].map((d) => ({
+    name: `j-${d}`,
+    date: new Date(now.getTime() - d * 86_400_000),
+  }));
+
+  const { remove } = applyRetention(backups, now);
+
+  assert(remove.length === 0, `${remove.length} sauvegarde récente supprimée`);
+});
+
+check("rétention : au-delà, une seule par mois est gardée", async () => {
+  const { applyRetention } = await import("./lib/retention.mjs");
+  const now = new Date("2026-08-07T12:00:00Z");
+  // Une sauvegarde récente, pour que la garde « jamais la plus récente » ne
+  // porte pas sur le mois ancien et que la règle mensuelle soit seule en cause.
+  const backups = [
+    { name: "hier", date: new Date("2026-08-06T00:00:00Z") },
+    { name: "mai-01", date: new Date("2026-05-01T00:00:00Z") },
+    { name: "mai-15", date: new Date("2026-05-15T00:00:00Z") },
+    { name: "mai-28", date: new Date("2026-05-28T00:00:00Z") },
+  ];
+
+  const { keep, remove } = applyRetention(backups, now);
+
+  // La plus ancienne du mois : c'est celle qui précède les changements du mois.
+  assert(keep.includes("mai-01"), "mai-01 n'est pas conservée");
+  assert(keep.includes("hier"), "la sauvegarde récente n'est pas conservée");
+  assert(keep.length === 2, `${keep.length} conservées au lieu de deux`);
+  assert(
+    remove.includes("mai-15") && remove.includes("mai-28"),
+    "les deux sauvegardes intermédiaires du mois devaient partir"
+  );
+});
+
+check("rétention : la plus récente n'est jamais supprimée", async () => {
+  // Si l'automatisation s'arrête des mois, la rétention ne doit pas achever le
+  // travail en effaçant la dernière copie — c'est le moment où elle compte le
+  // plus.
+  const { applyRetention } = await import("./lib/retention.mjs");
+  const now = new Date("2028-01-01T00:00:00Z");
+  const backups = [{ name: "unique", date: new Date("2026-05-01T00:00:00Z") }];
+
+  const { keep, remove } = applyRetention(backups, now);
+
+  assert(remove.length === 0, "la dernière sauvegarde a été supprimée");
+  assert(keep[0] === "unique", "la dernière sauvegarde n'est pas conservée");
+});
+
+check("rétention : un fichier étranger n'est jamais candidat", async () => {
+  // Le dossier peut contenir autre chose que des dumps — journal, notes. Un nom
+  // non conforme ne doit pas être supprimé « au passage ».
+  const { dateFromName } = await import("./lib/retention.mjs");
+
+  assert(dateFromName("journal.log") === null, "journal.log pris pour un dump");
+  assert(dateFromName("notes.txt") === null, "notes.txt pris pour un dump");
+  assert(
+    dateFromName(".derniere-reussite") === null,
+    "marqueur pris pour un dump"
+  );
+  assert(
+    dateFromName("2026-08-07T12-30-00.dump") instanceof Date,
+    "un dump valide n'est pas reconnu"
+  );
+});
+
 // --- Exécution --------------------------------------------------------------
 
 let failures = 0;

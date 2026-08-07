@@ -149,6 +149,92 @@ la protection de `main`.
 
 ---
 
+## D-062 — La sauvegarde est automatisée, et son angle mort est nommé
+
+**Date** : 2026-08-07
+**Contexte** : la politique existait, le mécanisme aussi, mais rien ne tournait tout seul.
+Une politique qu'il faut se rappeler d'appliquer n'est pas une politique.
+
+`pnpm db:backup:scheduled` est fait pour tourner **sans témoin**, ce qui change trois
+choses par rapport au geste manuel :
+
+- **rétention** (30 jours + 12 mensuelles) — sans elle, le dossier croît indéfiniment, et
+  une sauvegarde qui remplit le disque finit par empêcher les suivantes ;
+- **trace de succès** (`.derniere-reussite`) — sans elle, rien ne distingue « a tourné et
+  réussi » de « n'a jamais tourné » ;
+- **échec bruyant** — journal, notification système, code de sortie `1`.
+
+**Un dump vide est refusé.** `pg_dump` peut sortir en `0` sans rien produire si la
+connexion tombe au mauvais moment ; écrire ce fichier reviendrait à archiver du vide en
+croyant sauvegarder.
+
+**La rétention ne supprime jamais la sauvegarde la plus récente**, quelle que soit son
+ancienneté. Si l'automatisation s'arrête deux mois, la rétention ne doit pas achever le
+travail en effaçant la dernière copie — c'est le moment où elle compte le plus. Un test
+l'exige, et il a corrigé une attente erronée que j'avais écrite dans un autre cas.
+
+**Chiffrement** : FileVault est actif sur le poste en service — vérifié, pas supposé. Un
+fichier écrit sur ce disque est chiffré au repos par le système, sans outil supplémentaire.
+
+**Éprouvé par exécution**, pas seulement écrit : succès (5600 octets, permissions `600`,
+journal, preuve de vie) et échec simulé (code `1`, échec journalisé, **preuve de vie
+inchangée** — un échec ne peut pas se déguiser en succès).
+
+### Les deux angles morts, nommés plutôt que tus
+
+**La copie vit sur le poste de travail.** Elle protège de la perte du compte Neon — le
+scénario le plus probable — mais pas de la perte du poste. Ce n'est pas une copie hors
+site, et il faudra en ajouter une quand des données réelles existeront.
+
+**Une notification ne se déclenche que si le script s'exécute.** Elle attrape les échecs,
+jamais les **absences** d'exécution : machine éteinte plusieurs jours, agent déchargé,
+`pnpm` absent de l'environnement de `launchd`. C'est le cas le plus dangereux — rien ne se
+passe, et rien ne le dit.
+
+Le seul dispositif qui attrape une absence est **extérieur à la machine** : un moniteur de
+pulsation, appelé après chaque succès via `BACKUP_HEARTBEAT_URL`. Tant qu'il n'est pas
+posé, une interruption prolongée reste invisible. C'est écrit dans le script **et** dans
+`RECOVERY.md`, parce que c'est exactement le genre de limite qu'on oublie six mois plus
+tard.
+
+---
+
+## D-061 — Il n'y a pas un RPO, il y en a deux
+
+**Date** : 2026-08-07
+**Contexte** : D-059 arrêtait « RPO 1 h au premier client » et affirmait que « c'est la
+rétention d'historique du plan qui fixe le RPO ». **Ce raccourci est faux**, et il a
+produit un effet concret : le propriétaire, cherchant à s'aligner sur la politique, a
+d'abord **réduit** la rétention de 6 h à 1 h — c'est-à-dire réduit sa marge de sécurité en
+croyant l'ajuster.
+
+La rétention d'historique n'est pas le RPO. C'est la profondeur à laquelle on peut
+remonter le temps, donc une **fenêtre de détection**. Deux scénarios, deux chiffres :
+
+| Scénario | Ce qui sauve | Perte réelle |
+| --- | --- | --- |
+| Erreur logique (suppression, migration ratée) | historique PITR | **quasi nulle**, si détectée dans la fenêtre |
+| Perte du compte (suspension, facturation, compromission) | sauvegarde **hors hébergeur** | **intervalle entre deux sauvegardes** |
+
+Avec 6 heures de fenêtre, une migration destructrice passée à 14 h 00 se rattrape jusqu'à
+20 h 00 et ne coûte presque rien. Passé ce délai, on retombe sur le second scénario.
+
+**Conséquence pratique** : le seul levier sur le second scénario est la **fréquence de
+sauvegarde**, et il ne dépend d'aucun plan payant. Retenu : 1 par jour aujourd'hui,
+1 toutes les 6 heures au premier client — même coût, exposition ramenée de 24 h à 6 h.
+
+**Mesure** : `History retention` = 6 h sur le projet Neon en service, maximum de l'offre
+gratuite. Aucune raison de descendre en dessous, l'historique pesant 6,45 Mo.
+
+**Ce que ce cas enseigne**, et qui vaut au-delà des sauvegardes : une simplification écrite
+dans un document de référence ne reste pas une simplification. Elle est appliquée. Celle-ci
+a fait *baisser* une protection — un raccourci pédagogique s'est transformé en instruction,
+et l'instruction était mauvaise. C'est la même famille que tout ce que ce dépôt corrige
+depuis trois jours, à ceci près que l'affirmation fausse était **la mienne**, écrite la
+veille.
+
+---
+
 ## D-060 — Chaque risque porte désormais un déclencheur de réexamen
 
 **Date** : 2026-08-07

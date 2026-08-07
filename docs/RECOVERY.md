@@ -81,34 +81,135 @@ qu'aucune fonction interne à cet hébergeur ne peut faire.
 **Décidée le 2026-08-07** par le propriétaire du produit. Elle ferme R-004 et retire
 H-008.
 
-Deux régimes, parce que la tolérance change radicalement le jour où des données ne vous
-appartiennent plus.
+### Il n'y a pas un RPO, il y en a deux
+
+C'est la distinction qui gouverne tout le reste, et la confondre conduit à mesurer le
+mauvais chiffre — erreur commise et corrigée le 2026-08-07 (D-061).
+
+| Scénario | Ce qui sauve | Perte réelle |
+| --- | --- | --- |
+| **Erreur logique** — suppression, migration ratée, mauvais `UPDATE` | l'historique PITR de l'hébergeur | **quasi nulle**, à condition de détecter dans la fenêtre |
+| **Perte du compte** — suspension, facturation impayée, identifiants compromis | la sauvegarde **hors hébergeur** | **l'intervalle entre deux sauvegardes** |
+
+**La rétention d'historique n'est pas le RPO.** C'est la profondeur à laquelle on peut
+remonter le temps, donc une **fenêtre de détection** : avec 6 heures, une migration
+destructrice passée à 14 h 00 se rattrape jusqu'à 20 h 00 et ne coûte presque rien. Passé
+ce délai, la fenêtre est fermée et l'on retombe sur le second scénario.
+
+Le seul levier sur le second scénario est la **fréquence de sauvegarde**, et il ne dépend
+d'aucun plan payant.
+
+### Les chiffres
 
 | | **Avant le premier utilisateur réel** | **Dès le premier client** |
 | --- | --- | --- |
-| **RPO** — perte de données acceptable | 24 h | **1 h** |
-| **RTO** — indisponibilité acceptable | 24 h | **4 h** |
-| Fréquence | 1 sauvegarde par jour | historique PITR **+** 1 sauvegarde par jour |
-| Rétention | 30 jours | 30 jours glissants **+** 1 mensuelle gardée 12 mois |
-| Emplacement | **hors de l'hébergeur de la base** | **hors de l'hébergeur de la base** |
+| Fenêtre de détection (PITR) | 6 h — maximum du plan gratuit | 6 h, à étendre si le plan évolue |
+| **RPO en cas d'erreur logique** | ~0 si détectée dans la fenêtre | ~0 si détectée dans la fenêtre |
+| **RPO en cas de perte du compte** | **24 h** | **6 h** |
+| Fréquence de sauvegarde hors hébergeur | 1 par jour | **1 toutes les 6 h** |
+| **RTO** — indisponibilité acceptable | 24 h | 4 h |
+| Rétention des sauvegardes | 30 jours | 30 jours glissants + 1 mensuelle gardée 12 mois |
+| Emplacement | **hors de l'hébergeur de la base** | idem |
 | Répétition de restauration | 1 fois par trimestre | 1 fois par trimestre |
 | Responsable | propriétaire du produit | propriétaire du produit |
+
+**Mesuré le 2026-08-07** sur le projet Neon en service (plan gratuit, région AWS Europe
+West 2) : *History retention* = **6 heures**, maximum de l'offre. Aucune raison de
+descendre en dessous — l'historique pèse 6,45 Mo.
 
 ### Ce qui compte le plus n'est pas un chiffre
 
 **L'emplacement.** Une sauvegarde qui vit chez le même hébergeur que la base ne protège
-que d'une erreur de manipulation. Elle ne protège pas de la perte du compte — facturation
-impayée, suspension, compromission des identifiants de l'hébergeur. Il faut une copie
-ailleurs : un autre fournisseur de stockage, ou un disque chiffré au début.
+que du premier scénario. Elle ne protège pas du second — et c'est le second qui fait
+disparaître un produit. Il faut une copie ailleurs : un autre fournisseur de stockage, ou
+un disque chiffré au début.
 
-**Le PITR n'est pas une sauvegarde**, c'est un historique. Excellent pour rattraper une
-suppression accidentelle à 14 h 03 ; inutile si le compte disparaît. Les deux sont
-complémentaires, jamais interchangeables.
+**Une sauvegarde jamais restaurée n'est pas une sauvegarde.** D'où la répétition
+trimestrielle, restauration **ailleurs** que sur la source.
 
-⚠️ **C'est la rétention d'historique du plan qui fixe réellement le RPO**, pas l'intention
-écrite ici. Un RPO d'1 h avec une sauvegarde quotidienne n'est tenable que si le PITR
-couvre l'intervalle. Vérifier la fenêtre offerte par le plan **avant** de s'engager sur ce
-chiffre : quelques heures sur les offres gratuites, plusieurs jours au-delà.
+### Automatisation
+
+```bash
+pnpm db:backup:scheduled
+```
+
+Produit un dump dans `$BACKUP_DIR` (défaut `~/Sauvegardes/<dépôt>`), applique la rétention,
+laisse une trace de succès, et **échoue bruyamment**. Ce qui le distingue du `db:backup`
+manuel :
+
+| | `db:backup` | `db:backup:scheduled` |
+| --- | --- | --- |
+| Rétention | aucune | 30 jours + 12 mensuelles |
+| Trace de succès | aucune | `.derniere-reussite` |
+| Échec | message | journal, notification système, **code de sortie 1** |
+| Dump vide | écrit le fichier | **refuse** — `pg_dump` peut sortir en 0 sans rien produire |
+
+**Vérifié le 2026-08-07** par exécution réelle : succès (5600 octets, permissions `600`,
+journal, preuve de vie) et échec simulé (code 1, échec journalisé, **preuve de vie
+inchangée** — un échec ne peut pas se déguiser en succès).
+
+#### Le chiffrement
+
+Sur macOS avec **FileVault actif** — vérifié sur le poste en service — un fichier écrit sur
+le disque est chiffré au repos par le système. Aucun outil supplémentaire n'est nécessaire.
+
+⚠️ **Une sauvegarde sur le poste de travail protège de la perte du compte Neon, pas de la
+perte du poste.** C'est un progrès réel — c'est le scénario le plus probable — mais ce
+n'est pas une copie hors site. Ajouter une seconde destination (disque externe, stockage
+distant) quand des données réelles existeront.
+
+#### Planification (macOS)
+
+Écrire `~/Library/LaunchAgents/local.project0.sauvegarde.plist` :
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>local.project0.sauvegarde</string>
+  <key>WorkingDirectory</key> <string>/CHEMIN/VERS/LE/DEPOT</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>pnpm db:backup:scheduled</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>RunAtLoad</key>        <false/>
+  <key>StandardErrorPath</key><string>/tmp/project0-sauvegarde.err</string>
+</dict>
+</plist>
+```
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.project0.sauvegarde.plist
+```
+
+Passer à quatre entrées `StartCalendarInterval` (3 h, 9 h, 15 h, 21 h) le jour où la
+fréquence passe à une sauvegarde toutes les 6 heures.
+
+⚠️ `launchd` exécute la tâche **au réveil** si l'heure prévue est passée pendant la veille.
+Un portable fermé la nuit n'exécutera donc pas la sauvegarde à 3 h, mais à l'ouverture —
+c'est acceptable, à condition de le savoir.
+
+#### Le silence n'est pas un succès
+
+Une notification ne se déclenche **que si le script s'exécute**. Elle attrape les échecs,
+jamais les **absences** d'exécution — machine éteinte plusieurs jours, agent déchargé,
+`pnpm` introuvable dans l'environnement de `launchd`. Or c'est le cas le plus dangereux :
+rien ne se passe, et rien ne le dit.
+
+Le seul dispositif qui attrape une absence est **extérieur à la machine** : un moniteur de
+pulsation. En créer un chez BetterStack — déjà câblé dans le dépôt pour la supervision de
+disponibilité — puis renseigner `BACKUP_HEARTBEAT_URL` : le script l'appelle après chaque
+succès, et le moniteur alerte quand l'appel manque.
+
+Tant que `BACKUP_HEARTBEAT_URL` n'est pas renseignée, **une interruption prolongée reste
+invisible**. C'est la limite la plus importante de ce dispositif, et il faut la connaître.
 
 ### Mise en place
 
@@ -131,10 +232,11 @@ chiffre : quelques heures sur les offres gratuites, plusieurs jours au-delà.
 | --- | --- |
 | Mécanisme (`db:backup` / `db:restore`) | **fait et éprouvé** (D-027) |
 | Politique (chiffres ci-dessus) | **décidée le 2026-08-07** |
-| Vérification de la fenêtre PITR | **à faire** |
-| Emplacement hors hébergeur | **à choisir** |
-| Automatisation quotidienne | **à faire** |
-| Alerte d'échec | **à faire** |
+| Vérification de la fenêtre PITR | **faite le 2026-08-07 : 6 h** (plan gratuit) |
+| Emplacement hors hébergeur | **choisi** : poste de travail, FileVault actif. ⚠️ pas de copie hors site |
+| Automatisation de la sauvegarde | **écrite et éprouvée** (`db:backup:scheduled`) — **planification à installer** |
+| Alerte d'échec (exécution) | **faite** — journal, notification, code de sortie 1 |
+| Alerte d'**absence** d'exécution | **à faire** — moniteur de pulsation, `BACKUP_HEARTBEAT_URL` |
 | Première répétition trimestrielle | **à planifier** |
 
 Tant que les cinq dernières lignes ne sont pas faites, **la politique existe mais n'est
