@@ -10,15 +10,32 @@ Monorepo Turborepo basé sur [next-forge](https://github.com/vercel/next-forge) 
 
 ```bash
 pnpm install
-pnpm hooks:install             # garde-fou : pas de push direct sur main
-docker compose up -d           # Postgres local (port réglé dans .env)
-cp apps/app/.env.example apps/app/.env.local   # puis renseigner les variables
+pnpm env:setup                              # crée les .env.local des 6 workspaces
+pnpm --filter @repo/database run build      # génère le client Prisma
+docker compose up -d                        # Postgres local (port réglé dans .env)
+pnpm migrate                                # applique les migrations
 pnpm dev
 ```
 
+Deux étapes ne sont pas décoratives, et leur oubli produit des erreurs qui ne
+désignent pas leur cause :
+
+- **`pnpm env:setup`** plutôt qu'un `cp` des `.env.example`. Une variable optionnelle
+  laissée à `""` **échoue** la validation Zod — recopier le fichier tel quel empêche
+  l'application de démarrer. Le script commente les lignes vides et renseigne
+  `DATABASE_URL` depuis le `.env` racine. Il ne remplace jamais un `.env.local`
+  existant sans `--force`.
+- **La génération du client Prisma.** `pnpm install` ne la déclenche pas. Sans elle,
+  un clone neuf échoue avec `Cannot find module './generated/client'` — vérifié le
+  2026-08-07 sur une installation vierge.
+
 Variables réellement requises : `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`,
-`NEXT_PUBLIC_WEB_URL`. Une variable optionnelle laissée à `""` échoue la validation :
-la commenter. Détail dans [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
+`NEXT_PUBLIC_WEB_URL`. Les clés de services tiers sont commentées par `env:setup` :
+les décommenter au fur et à mesure. Détail dans
+[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
+
+`pnpm hooks:install` (garde-fou anti-push direct sur `main`) tourne automatiquement à
+l'installation ; la commande n'est utile que pour le réinstaller.
 
 Ports : `app` 3000 · `web` 3001 · `api` 3002 · `email` 3003 · `docs` 3004 ·
 `studio` 3005 · `storybook` 6006.
