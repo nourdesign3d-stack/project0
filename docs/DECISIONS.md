@@ -111,6 +111,57 @@ seul outil de graphe.
 
 ---
 
+## D-034 — Les en-têtes de sécurité, enfin mesurés — et absents de deux apps sur trois
+
+**Date** : 2026-08-06
+**Contexte** : `SECURITY_MODEL.md` déclarait Nosecone « actif » depuis le premier jour.
+Personne n'avait jamais regardé ce qui sortait réellement. Un audit externe l'a fait.
+
+**Constaté, puis reproduit** :
+
+| Application | En-têtes servis avant |
+| --- | --- |
+| `apps/app` | l'ensemble complet |
+| `apps/web` | **aucun** |
+| `apps/api` | **aucun** |
+
+**Deux causes distinctes.** `apps/web/proxy.ts` faisait
+`return middlewareResponse || headersResponse`. Le middleware d'internationalisation
+renvoie **toujours** quelque chose — une réécriture pour `/`, une redirection pour
+`/en/...` — donc la réponse portant les en-têtes était systématiquement jetée. Un `||` a
+suffi à désarmer tout le dispositif sur le site public, celui qui reçoit justement le
+trafic anonyme. Et `apps/api` n'avait **aucun proxy** : ses webhooks, son `/health` et sa
+tâche planifiée répondaient sans le moindre en-tête.
+
+**Décision** : compléter les en-têtes de la réponse d'i18n au lieu de la remplacer, et
+doter `apps/api` de son propre proxy. `poweredByHeader: false` au passage — `X-Powered-By`
+annonçait la pile sans contrepartie.
+
+**Mesuré après correction**, build de production, requête réelle :
+
+- `apps/web` sur `/en`, soit **une redirection 307** — le cas exact qui échouait :
+  `strict-transport-security`, `x-frame-options`, `x-content-type-options`,
+  `referrer-policy`, les trois `cross-origin-*`, `x-permitted-cross-domain-policies`.
+  Aucun `x-powered-by`.
+- `apps/api` sur `/health` : le même ensemble.
+
+**Un contrôle durable, pas une case cochée** : `e2e/tests/security-headers.spec.ts`
+interroge l'application en marche et lit les en-têtes, avec un cas dédié à la redirection.
+Il ne couvre que `apps/app` — la suite e2e ne démarre qu'une application (R-026).
+
+**Ce que je ne corrige pas, et qui est plus grave que ce qui précède** : la **CSP est
+désactivée** sur les trois apps, par configuration héritée du template, et aucun document
+ne le signalait. Elle ne peut pas être générique : elle se rédige à partir des origines
+réellement utilisées — Clerk, Sentry, PostHog, Vercel. Devenu **R-025**, à traiter avant
+toute mise en service.
+
+**Note de méthode** : mesurer a exigé de fabriquer une clé Clerk locale non fonctionnelle,
+parce que la graine renvoie `500` sur toutes les routes sans clé. C'est le constat n°5 de
+l'audit, traité séparément — mais il explique pourquoi personne n'avait jamais vu ces
+en-têtes : il fallait d'abord franchir un mur.
+
+**Effet de bord relevé par le contrôle de frontières** : `apps/api` importait
+`@repo/security` sans le déclarer. `pnpm boundaries` l'a refusé — le garde-fou a fonctionné.
 ## D-033 — Le contrôle d'autorisation vit dans la route, pas dans le layout
 
 **Date** : 2026-08-06
