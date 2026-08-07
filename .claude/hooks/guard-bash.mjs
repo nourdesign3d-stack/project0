@@ -33,7 +33,7 @@
  */
 
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { parseCommand, resolveInvocation } from "./lib/shell-tokens.mjs";
 
 const SECRET_PATHS = [
@@ -162,17 +162,28 @@ const hasFlag = (args, test) =>
 /**
  * Règles destructives. `check(args)` ne regarde que les arguments : le contenu
  * d'un message ou d'un fichier ne peut pas les déclencher.
+ *
+ * `sandboxable` marque les seules règles dont l'objet **est** un chemin de
+ * fichier : elles acceptent l'exemption du bac à sable temporaire. Les autres ne
+ * la reçoivent jamais — `git push --force`, `prisma db push`, `docker system
+ * prune` ou `vercel` ne détruisent rien qui vive dans un dossier, et rien dans
+ * leur ligne de commande n'est un chemin. Les exempter parce que le dossier
+ * courant est temporaire n'avait aucun sens ; c'était pourtant le cas jusqu'au
+ * 2026-08-07, où un audit a montré qu'un dépôt cloné sous /tmp désarmait les 26
+ * règles d'un coup.
  */
 const DESTRUCTIVE = [
   {
     command: "rm",
     check: (args) => hasFlag(args, (v) => RECURSIVE_RM.test(v)),
     why: "suppression récursive ou forcée",
+    sandboxable: true,
   },
   {
     command: "find",
     check: (args) => has(args, "-delete") || has(args, "-exec", "-execdir"),
     why: "suppression de masse via find",
+    sandboxable: true,
   },
   {
     command: "git",
@@ -234,11 +245,13 @@ const DESTRUCTIVE = [
     command: "shred",
     check: () => true,
     why: "effacement irréversible du contenu d'un fichier",
+    sandboxable: true,
   },
   {
     command: "truncate",
     check: (args) => hasFlag(args, (value) => value.startsWith("-s")),
     why: "vidage d'un fichier",
+    sandboxable: true,
   },
   {
     command: "dd",
@@ -307,14 +320,23 @@ const isSecretPath = (value) => {
 /**
  * Tous les chemins visés sont-ils dans un dossier temporaire ?
  *
- * ⚠️ La version précédente ne retenait que les chemins **absolus**. Dans
- * `rm -rf /tmp/keep ~/Documents`, `~/Documents` n'étant pas absolu, il ne restait
- * que `/tmp/keep` : « tout est temporaire », règle sautée. Même effet avec un
- * chemin relatif ou un motif — mesuré en audit le 2026-08-06.
+ * ⚠️ Deux défauts corrigés, dans cet ordre :
  *
- * Désormais **chaque** argument qui n'est pas un drapeau compte, après expansion
- * du `~` et résolution depuis le dossier courant. Un seul chemin hors du bac à
- * sable suffit à faire appliquer la règle.
+ * 1. La version d'origine ne retenait que les chemins **absolus**. Dans
+ *    `rm -rf /tmp/keep ~/Documents`, `~/Documents` n'étant pas absolu, il ne
+ *    restait que `/tmp/keep` : « tout est temporaire », règle sautée.
+ *    Corrigé le 2026-08-06 en résolvant **chaque** argument depuis le dossier
+ *    courant.
+ *
+ * 2. Cette correction en a créé une pire. Résoudre depuis le dossier courant
+ *    rendait l'exemption **contagieuse** : dès que le dépôt lui-même vivait
+ *    sous `/tmp` ou `$TMPDIR` — un clone d'audit, un bac à sable d'agent — tout
+ *    argument relatif résolvait en zone temporaire et **la totalité des règles
+ *    sautait**. Relevé en audit le 2026-08-07.
+ *
+ * Un chemin doit désormais être **absolu par lui-même**, après expansion du `~`.
+ * Le dossier courant n'entre plus dans la décision : c'est ce qui rend le
+ * verdict indépendant de l'endroit où le dépôt est cloné.
  */
 const expandHome = (value) =>
   value === "~" || value.startsWith("~/")
@@ -324,11 +346,14 @@ const expandHome = (value) =>
 const onlyTemporaryPaths = (args) => {
   const paths = args
     .map((token) => token.value)
-    .filter((value) => !value.startsWith("-"));
+    .filter((value) => !value.startsWith("-"))
+    .map(expandHome);
 
   return (
     paths.length > 0 &&
-    paths.every((path) => TEMPORARY.test(resolve(expandHome(path))))
+    // `isAbsolute` avant `resolve` : sans ce filtre, `resolve("docs")` emprunte
+    // le dossier courant et un dépôt cloné sous /tmp désarme le garde-fou.
+    paths.every((path) => isAbsolute(path) && TEMPORARY.test(resolve(path)))
   );
 };
 
@@ -369,11 +394,15 @@ const checkDestructive = (command, args) => {
     );
   }
 
-  if (onlyTemporaryPaths(args)) {
-    return;
-  }
+  // L'exemption est calculée une fois, mais n'est offerte qu'aux règles qui
+  // portent sur des chemins : elle ne doit pas se propager aux autres.
+  const inSandbox = onlyTemporaryPaths(args);
 
   for (const rule of DESTRUCTIVE) {
+    if (rule.sandboxable && inSandbox) {
+      continue;
+    }
+
     if (rule.command === command && rule.check(args)) {
       deny(
         `commande destructive — ${rule.why}`,

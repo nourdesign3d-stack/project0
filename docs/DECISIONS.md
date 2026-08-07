@@ -111,6 +111,48 @@ seul outil de graphe.
 
 ---
 
+## D-040 — Le garde-fou Bash se désarmait tout seul sous /tmp
+
+**Date** : 2026-08-07
+**Contexte** : D-036 corrigeait six défauts du garde-fou. L'un d'eux — l'exemption
+du bac à sable temporaire ne voyant que les chemins **absolus** — a été réparé en
+résolvant chaque argument depuis le dossier courant. **Cette correction en a créé une
+bien pire.**
+
+Résoudre depuis le dossier courant rend l'exemption **contagieuse**. Dès que le dépôt
+lui-même vit sous `/tmp` ou `$TMPDIR` — un clone d'audit, un bac à sable d'agent, un
+`mktemp -d` — tout argument relatif résout en zone temporaire, et **la totalité des
+règles saute**. Y compris celles qui n'ont aucun rapport avec un chemin :
+`git push --force`, `prisma db push`, `docker system prune`, `vercel env pull`.
+
+C'est le contournement le plus large que ce garde-fou ait connu, et il ne demandait
+aucun obscurcissement : il suffisait de travailler au mauvais endroit. Relevé en audit
+le 2026-08-07 — par un auditeur qui travaillait précisément dans un clone temporaire.
+
+**Deux corrections, parce qu'il y avait deux erreurs de raisonnement.**
+
+*Un chemin doit être absolu par lui-même.* Le dossier courant n'entre plus dans la
+décision : c'est ce qui rend le verdict indépendant de l'endroit où le dépôt est cloné.
+Un chemin relatif désigne ce que contient le dossier courant — c'est-à-dire le dépôt —
+et n'a jamais prouvé qu'on visait un bac à sable.
+
+*L'exemption ne s'offre qu'aux règles qui portent sur des chemins.* Elles sont marquées
+`sandboxable` : `rm`, `find`, `shred`, `truncate`. Les autres ne la reçoivent jamais.
+Rien dans `git push --force origin main` n'est un chemin ; l'exempter parce que le
+dossier courant est temporaire n'avait aucun sens.
+
+**Preuve.** 15 cas rejouent des commandes **depuis un dossier temporaire**, le harnais
+de test acceptant désormais un dossier d'exécution. Sur le code d'avant : `11 écart(s)
+sur 130 cas`. Après : `130 cas vérifiés, aucun écart`.
+
+**Ce que ce défaut enseigne**, et qui dépasse ce fichier : la correction de D-036 avait
+été validée par des tests **tous lancés depuis la racine du dépôt**. Un harnais qui
+n'exerce qu'un seul contexte d'exécution ne peut pas voir un défaut qui dépend du
+contexte d'exécution. C'est le pendant exact de D-039 — sauf qu'ici, ce n'est pas un
+commentaire qui promettait à tort, c'est un test.
+
+---
+
 ## D-039 — Deux promesses que le code ne tenait pas
 
 **Date** : 2026-08-06
