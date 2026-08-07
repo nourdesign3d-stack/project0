@@ -71,3 +71,49 @@ rules:
     paths:
       exclude:
         - "**/node_modules/**"
+
+  # ── Isolation multi-tenant ────────────────────────────────────────────────
+  #
+  # L'invariant le plus critique d'une graine multi-tenant, et le seul qui
+  # n'avait **aucun garde-fou** : `.claude/rules/security.md` exige que « toute
+  # requête Prisma sur une donnée scopée inclue le filtre de tenant dans le
+  # `where`, jamais seulement en post-filtrage » — une phrase, que rien ne faisait
+  # respecter. Relevé en réaudit le 2026-08-07 (D-069).
+  #
+  # La règle ne connaît **aucun modèle** : elle ne suppose donc rien du produit,
+  # et c'est ce qui lui permet de vivre dans la graine. Elle s'appliquera au
+  # premier modèle scopé écrit dans un projet dérivé.
+  #
+  # Ce qu'elle attrape : une lecture ou une écriture Prisma dont le `where` ne
+  # mentionne aucun champ de tenant. Ce qu'elle **n'attrape pas** : un filtre
+  # posé sur le mauvais tenant, ou un identifiant fourni par le client et non
+  # re-résolu côté serveur. C'est une borne, pas une preuve — la revue reste
+  # nécessaire.
+  #
+  # Modèles d'infrastructure exemptés nommément : ils ne portent aucune donnée
+  # d'organisation. Toute nouvelle exemption doit être justifiée ici.
+  - id: local-tenant-filter-required
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Requête Prisma sans filtre de tenant. Toute donnée scopée à une
+      organisation doit porter le filtre dans le `where`, jamais en
+      post-filtrage (.claude/rules/security.md). Si ce modèle n'est pas scopé,
+      l'ajouter aux exemptions de cette règle en le justifiant.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$MODEL.findMany({...})
+          - pattern: $DB.$MODEL.findFirst({...})
+          - pattern: $DB.$MODEL.updateMany({...})
+          - pattern: $DB.$MODEL.deleteMany({...})
+      # Le filtre de tenant peut porter plusieurs noms selon le schéma choisi.
+      - pattern-not: $DB.$MODEL.$OP({..., where: {..., organizationId: ...}, ...})
+      - pattern-not: $DB.$MODEL.$OP({..., where: {..., orgId: ...}, ...})
+      - pattern-not: $DB.$MODEL.$OP({..., where: {..., tenantId: ...}, ...})
+      # Modèles d'infrastructure : aucune donnée d'organisation.
+      - pattern-not: $DB.webhookEvent.$OP({...})
+    paths:
+      exclude:
+        - "**/node_modules/**"
+        - "**/packages/database/generated/**"
+        - "**/__tests__/**"

@@ -149,6 +149,70 @@ la protection de `main`.
 
 ---
 
+## D-070 — La graine ne livre plus de modèle de démonstration
+
+**Date** : 2026-08-07
+**Contexte** : `Page` était le stub du gabarit. `DATA_DICTIONARY.md` le donnait « à
+supprimer » depuis l'initialisation, et deux pages réelles l'interrogeaient encore —
+l'accueil authentifié et la recherche.
+
+Une graine qui livre une table de démonstration la fait supprimer par **chaque** projet
+dérivé, et en attendant, sa page d'accueil affiche des données qui n'existent pas. Ce
+n'était pas une dette théorique : sur un clone neuf, ces deux requêtes produisaient deux
+des quatre erreurs de typage constatées en D-042.
+
+**Ce qui reste est délibérément vide.** C'est l'emplacement du produit, et la graine n'a
+pas à décider ce qui s'y trouve. La validation de la requête de recherche et sa borne sont
+conservées : c'est la partie réutilisable, et la recherche est typiquement la première
+route coûteuse qu'un produit expose (R-003).
+
+### Une faute commise en chemin, et la règle qui en sort
+
+La migration a d'abord **échoué** : Prisma a refusé d'avancer, signalant qu'une migration
+précédente « avait été modifiée après avoir été appliquée ». C'était vrai — j'avais ajouté
+un commentaire explicatif dans `20260807095046_webhook_event_completion/migration.sql`
+**après** son application, en D-049. Prisma en mémorise la somme de contrôle.
+
+La seule issue que Prisma propose est `migrate reset`, c'est-à-dire la perte de la base de
+développement. **La bonne correction n'était pas de forcer** : c'était de restaurer le
+fichier tel qu'il avait été appliqué, et de laisser le « pourquoi » là où il a toujours eu
+sa place — dans `DECISIONS.md`, qui n'a pas de somme de contrôle.
+
+Règle ajoutée à `.claude/rules/database.md` : **une migration appliquée ne se modifie
+plus, pas même pour y ajouter un commentaire.**
+
+C'est une bonne intention qui a produit un blocage réel — et elle avait été **louée** par
+l'audit (« il écrit dans ses migrations pourquoi un index existe »). Un compliment n'est
+pas une validation.
+
+---
+
+## D-069 — L'invariant d'isolation a enfin un garde-fou
+
+**Date** : 2026-08-07
+**Contexte** : `.claude/rules/security.md` exige depuis l'initialisation que « toute requête
+Prisma sur une donnée scopée inclue le filtre de tenant dans le `where`, jamais seulement
+en post-filtrage ». C'était **une phrase, que rien ne faisait respecter** — l'invariant le
+plus critique d'une graine multi-tenant, sans aucun contrôle, relevé en réaudit.
+
+La règle Semgrep `local-tenant-filter-required` refuse une lecture ou une écriture Prisma
+dont le `where` ne mentionne aucun champ de tenant (`organizationId`, `orgId`, `tenantId`).
+
+**Elle ne connaît aucun modèle**, et c'est ce qui lui permet de vivre dans une graine :
+elle ne suppose rien du produit, et s'appliquera au premier modèle scopé écrit dans un
+projet dérivé. Les modèles d'infrastructure sont exemptés **nommément**, jamais par
+catégorie.
+
+**Ce qu'elle n'attrape pas, et qu'il faut dire** : un filtre posé sur le mauvais tenant, ou
+un identifiant fourni par le client et non re-résolu côté serveur. C'est une borne, pas une
+preuve. La revue reste nécessaire — et R-028 note qu'elle n'existe pas.
+
+⚠️ **Non éprouvée localement** : Semgrep n'est pas installé sur le poste. La règle est
+validée par le job CI, qui refuse une règle malformée. Qu'elle **se déclenche** réellement
+reste à constater sur le premier modèle scopé — c'est écrit ici plutôt que supposé.
+
+---
+
 ## D-068 — L'absence de relecture indépendante est inscrite comme risque
 
 **Date** : 2026-08-07

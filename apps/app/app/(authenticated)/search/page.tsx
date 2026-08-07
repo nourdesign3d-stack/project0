@@ -1,5 +1,4 @@
 import { auth } from "@repo/auth/server";
-import { database } from "@repo/database";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { Header } from "../components/header";
@@ -40,28 +39,27 @@ const SearchPage = async ({ searchParams }: SearchPageProperties) => {
     redirect("/");
   }
 
-  // TODO(domaine) : ajouter le filtre de tenant (`orgId`) dès que `Page`
-  // devient une entité métier — invariant INV-001.
-  const pages = await database.page.findMany({
-    where: {
-      name: {
-        contains: query.data,
-      },
-    },
-    take: 50,
-  });
+  /**
+   * ⚠️ Cette page cherchait dans `Page`, le modèle de **démonstration** retiré le
+   * 2026-08-07 (D-070). La validation de la requête est conservée : c'est la
+   * partie réutilisable, et la recherche est typiquement la première route
+   * coûteuse qu'un produit expose (R-003).
+   *
+   * ⚠️ **La requête à écrire ici devra porter le filtre de tenant dans le
+   * `where`**, jamais en post-filtrage — invariant INV-001. Une recherche sans
+   * filtre est la fuite inter-organisation la plus banale : elle ne ressemble
+   * pas à une faille, elle ressemble à une recherche. La règle Semgrep
+   * `local-tenant-filter-required` la refuse.
+   */
 
   return (
     <>
       <Header page="Search" pages={["Building Your Application"]} />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          {pages.map((page) => (
-            <div className="aspect-video rounded-xl bg-muted/50" key={page.id}>
-              {page.name}
-            </div>
-          ))}
-        </div>
+        <p className="text-muted-foreground text-sm">
+          Recherche de « {query.data} » — aucun modèle à interroger tant que le
+          produit n'en définit pas.
+        </p>
         <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
       </div>
     </>
