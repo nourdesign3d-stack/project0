@@ -149,6 +149,53 @@ la protection de `main`.
 
 ---
 
+## D-072 — Le premier usage réel a fait échouer le premier `pnpm verify`
+
+**Date** : 2026-08-07
+**Contexte** : un premier produit a été créé depuis la graine. Son amorçage s'est arrêté
+sur `la vérification a échoué : corriger avant d'aller plus loin` — et l'échec portait sur
+un test que j'avais écrit la veille :
+
+```
+FAIL  __tests__/documentation-claims.test.ts
+AssertionError: le modèle WebhookEvent n'apparaît pas dans docs/DATA_DICTIONARY.md
+```
+
+**Cause** : `DATA_DICTIONARY.md` fait partie des documents remis à zéro par
+l'initialisation — c'est correct, un produit ne doit pas hériter du dictionnaire d'un
+autre. Mais `WebhookEvent` **reste dans le schéma** : c'est un modèle d'infrastructure, pas
+de domaine, et il survit à la remise à zéro. Le squelette ne le mentionnait pas.
+
+Le test de D-057 et la remise à zéro de `project:init` étaient donc **en contradiction**, et
+rien ne les reliait.
+
+**Le squelette était périmé de trois façons** : il listait encore `Page`, supprimé la
+veille (D-070) ; il ignorait `WebhookEvent`, introduit en D-023 ; il mentionnait BaseHub,
+retiré en D-031. Personne ne regarde `docs/_skeletons/` — c'est le seul dossier du dépôt
+qu'aucun test ne lisait.
+
+**Ce qui est corrigé** : le squelette porte les quatre champs de `WebhookEvent`, avec la
+mention qu'ils ne se suppriment pas. Et un contrôle relie désormais les deux — le squelette
+doit couvrir chaque modèle que la graine livre. Vu échouer.
+
+### Ce que ce cas enseigne, et il vaut les trois audits
+
+C'est le **premier usage réel** de la graine, et il a trouvé en quelques secondes un défaut
+que trois audits externes n'avaient pas vu — parce qu'aucun n'a exécuté `project:init` puis
+`pnpm verify`. Le défaut n'existe que dans l'état **après initialisation**, un état que le
+dépôt lui-même ne présente jamais.
+
+Un test qui lit un document remis à zéro par l'initialisation est **couplé à l'initialisation**,
+que son auteur le sache ou non. Il en reste deux dans ce dépôt — `onboarding.test.ts` lit
+le README, `setup-guide.test.ts` lit `SETUP.md` — et ni l'un ni l'autre n'est dans la liste
+des documents remis à zéro. Vérifié, pas supposé.
+
+**La leçon générale** : une graine ne se teste pas dans son propre dépôt. Elle se teste dans
+un clone initialisé. C'est la seule vérification qui exerce l'état que reçoivent réellement
+ses utilisateurs.
+
+---
+
 ## D-071 — Le cache Turborepo avait atteint 43 Go
 
 **Date** : 2026-08-07

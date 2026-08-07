@@ -750,6 +750,46 @@ check("rétention : un fichier étranger n'est jamais candidat", async () => {
   );
 });
 
+check(
+  "un projet fraîchement initialisé passe le contrôle du dictionnaire",
+  () => {
+    // ⚠️ `DATA_DICTIONARY.md` fait partie des documents remis à zéro par
+    // l'initialisation, mais `WebhookEvent` **reste** dans le schéma : c'est un
+    // modèle d'infrastructure, pas de domaine. Le squelette ne le mentionnait
+    // pas, et `documentation-claims.test.ts` échouait donc sur **tout** projet
+    // neuf — le tout premier `pnpm verify` d'un repreneur (D-072).
+    //
+    // Ce contrôle relie les deux : le squelette doit couvrir chaque modèle que
+    // la graine livre. Il vit ici parce que c'est l'initialisation qui crée le
+    // couplage.
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const schema = readFileSync(
+      join(root, "packages/database/prisma/schema.prisma"),
+      "utf8"
+    );
+    const skeleton = readFileSync(
+      join(root, "docs/_skeletons/DATA_DICTIONARY.md"),
+      "utf8"
+    );
+
+    const models = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map(
+      ([, name]) => name
+    );
+
+    assert(
+      models.length > 0,
+      "aucun modèle trouvé : le chemin a-t-il changé ?"
+    );
+
+    for (const model of models) {
+      assert(
+        skeleton.includes(model),
+        `le squelette du dictionnaire ignore ${model} : un projet neuf échouera à son premier pnpm verify`
+      );
+    }
+  }
+);
+
 // --- Exécution --------------------------------------------------------------
 
 let failures = 0;
