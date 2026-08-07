@@ -9,8 +9,19 @@ d'être persistée ou envoyée à un tiers.
 | --- | --- | --- | --- | --- | --- | --- |
 | `Page.id` | Identifiant du stub de démonstration | Postgres | aucune | — | à supprimer | `@id @default(autoincrement())` |
 | `Page.name` | Libellé du stub | Postgres | aucune | — | à supprimer | aucune |
+| `WebhookEvent.provider` | Fournisseur émetteur (`clerk`, `stripe`) | Postgres | aucune | — | 30 jours après achèvement | partie de la clé primaire composite |
+| `WebhookEvent.eventId` | Identifiant de **livraison** du fournisseur (`svix-id`, `evt_…`) | le fournisseur | interne | — | 30 jours après achèvement | partie de la clé primaire composite — c'est **elle** qui garantit l'idempotence, pas une vérification applicative |
+| `WebhookEvent.receivedAt` | Instant de la réservation, remis à jour lors d'une reprise | Postgres | aucune | — | 30 jours après achèvement | indexé : sert la purge **et** la reprise des réservations abandonnées |
+| `WebhookEvent.completedAt` | Instant où le traitement a abouti ; `null` = réservé, issue inconnue | Postgres | aucune | — | conservé tant que `null` | distingue réservé de terminé (D-049) |
 
-Aucune donnée métier n'est encore persistée.
+Aucune donnée métier n'est encore persistée. `WebhookEvent` est un modèle
+d'**infrastructure** : il ne suppose rien du produit et ne porte aucune donnée
+personnelle — un identifiant de livraison opaque, deux horodatages.
+
+⚠️ **Une ligne dont `completedAt` reste `null` n'est jamais purgée**, volontairement :
+c'est la trace d'un traitement qui ne s'est pas terminé, et c'est le seul incident de
+cette table qui mérite d'être vu. La tâche `/cron/purge-webhook-events` les compte et les
+journalise sans les supprimer.
 
 ## Données détenues par des tiers
 
