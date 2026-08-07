@@ -154,7 +154,10 @@ jobs:
           # neuve, donc ce code est exigé à chaque exécution.
           E2E_USER_OTP: ${{ secrets.E2E_USER_OTP }}
 
-      # Les rapports peuvent contenir des captures d'écran : ne jamais y laisser de secret.
+      # ⚠️ GitHub caviarde les secrets dans les journaux, **jamais** dans les
+      # artefacts. Un rapport Playwright contient traces, vidéos et captures :
+      # les parcours manipulant des identifiants doivent les désactiver
+      # eux-mêmes (voir e2e/tests/access-control.spec.ts, D-037).
       - name: Rapport Playwright
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

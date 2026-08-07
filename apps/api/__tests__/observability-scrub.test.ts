@@ -68,6 +68,57 @@ describe("filtrage des événements Sentry", () => {
     expect(contexts.nextjs.request_path).toBe("/boom");
   });
 
+  test("retire une chaîne de requête au milieu d'un message", () => {
+    // Le cas de tous les jours, et celui qui n'était pas couvert : un message
+    // d'erreur de `fetch` embarque l'URL appelée. L'expression était ancrée en
+    // début de chaîne, donc elle ne le voyait pas (D-035).
+    const event = scrubRequest({
+      message: "fetch failed: https://api.exemple.test/reset?token=SECRET-MSG",
+      exception: {
+        values: [{ value: "Error at /callback?code=SECRET-EXC returned 500" }],
+      },
+      breadcrumbs: [
+        { message: "GET api.exemple.test/v1/x?key=SECRET-SANS-SCHEMA" },
+      ],
+    });
+
+    expect(JSON.stringify(event)).not.toContain("SECRET-");
+  });
+
+  test("conserve le texte autour de l'URL amputée", () => {
+    // Couper le jeton ne doit pas coûter le message : sans contexte, un
+    // événement filtré devient inexploitable, et le filtre finit contourné.
+    const { message } = scrubRequest({
+      message:
+        "fetch failed: https://api.exemple.test/reset?token=SECRET après 3 essais",
+    });
+
+    expect(message).toBe(
+      "fetch failed: https://api.exemple.test/reset après 3 essais"
+    );
+  });
+
+  test("filtre au-delà de la profondeur d'un événement volumineux", () => {
+    // La borne de profondeur était de 12 : tout ce qui se trouvait plus bas
+    // ressortait intact. Les cycles sont désormais traités séparément.
+    let deep: Record<string, unknown> = { url: "/x?token=SECRET-PROFOND" };
+
+    for (let level = 0; level < 30; level += 1) {
+      deep = { child: deep };
+    }
+
+    expect(JSON.stringify(scrubRequest(deep))).not.toContain("SECRET-");
+  });
+
+  test("survit à une référence circulaire", () => {
+    const event: Record<string, unknown> = { url: "/x?token=SECRET-CYCLE" };
+
+    event.self = event;
+
+    expect(() => scrubRequest(event)).not.toThrow();
+    expect(event.url).toBe("/x");
+  });
+
   test("n'ampute pas une chaîne qui n'est pas une URL", () => {
     // La politique vise les URL, pas tout texte contenant un point
     // d'interrogation — un message d'erreur en pose souvent un.

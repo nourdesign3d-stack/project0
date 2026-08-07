@@ -31,10 +31,9 @@ const composedMiddleware = createNEMO(
 
 // Clerk middleware wraps other middleware in its callback
 export default authMiddleware(async (_auth, request, event) => {
-  // Run security headers first
-  const headersResponse = securityHeaders();
+  const headersResponse = await securityHeaders();
 
-  // Then run composed middleware (i18n)
+  // Puis le middleware composé (i18n)
   const middlewareResponse = await composedMiddleware(
     // La requête fournie par Clerk n'expose pas le type NextRequest attendu par
     // createNEMO ; conversion imposée par next-forge.
@@ -43,7 +42,27 @@ export default authMiddleware(async (_auth, request, event) => {
     event
   );
 
-  // Return middleware response if it exists, otherwise headers response
-  return middlewareResponse || headersResponse;
+  if (!middlewareResponse) {
+    return headersResponse;
+  }
+
+  /**
+   * ⚠️ Le code d'origine renvoyait `middlewareResponse || headersResponse`.
+   * Le middleware d'internationalisation renvoie **toujours** quelque chose —
+   * une réécriture pour `/`, une redirection pour `/en/...` — donc les en-têtes
+   * de sécurité étaient **systématiquement jetés**. Mesuré le 2026-08-06 : le
+   * site public ne servait aucun en-tête, alors que `SECURITY_MODEL.md` les
+   * déclarait actifs (D-034).
+   *
+   * Les en-têtes existants de la réponse d'i18n sont préservés : on complète,
+   * on n'écrase pas.
+   */
+  for (const [key, value] of headersResponse.headers) {
+    if (!middlewareResponse.headers.has(key)) {
+      middlewareResponse.headers.set(key, value);
+    }
+  }
+
+  return middlewareResponse;
   // nosemgrep: local-no-ts-suppression -- même motif que apps/app/proxy.ts.
 }) as unknown as NextProxy;

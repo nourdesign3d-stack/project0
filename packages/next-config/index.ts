@@ -2,6 +2,10 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
 
 export const config: NextConfig = {
+  // `X-Powered-By: Next.js` annonce la pile et sa version approximative à
+  // quiconque interroge le serveur. Aucun bénéfice, un renseignement offert.
+  poweredByHeader: false,
+
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

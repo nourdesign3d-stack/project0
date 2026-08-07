@@ -35,7 +35,7 @@ Puis, selon le périmètre :
 ```bash
 pnpm semgrep                 # tout changement touchant une frontière serveur
 pnpm e2e                     # parcours critiques (nécessite une app démarrée)
-pnpm build                   # build complet (nécessite BASEHUB_TOKEN)
+pnpm build                   # build complet — aucun jeton de service requis (D-031)
 ```
 
 Une commande non exécutable (secret ou service manquant) est reportée en

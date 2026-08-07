@@ -38,7 +38,6 @@ Ports : `app` 3000 · `web` 3001 · `api` 3002 · `email` 3003 · `docs` 3004 ·
 | Frontières | `pnpm boundaries` |
 | Migrations | `pnpm migrate` · `pnpm migrate:deploy` · `pnpm migrate:status` |
 
-`pnpm build` complet nécessite `BASEHUB_TOKEN` (build de `@repo/cms`, requis par `apps/web`).
 
 ## Structure
 
