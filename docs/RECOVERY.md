@@ -22,7 +22,28 @@ que lui.
 L'URL n'apparaît jamais à l'écran ni dans une ligne de commande : elle passe par
 l'environnement du conteneur. Les scripts n'affichent que l'hôte et le nom de la base.
 
-## Répétition exécutée le 2026-08-05
+## Répétition exécutée le 2026-08-07, sur le code en vigueur
+
+⚠️ **Une répétition vaut pour le code qu'elle a éprouvé, pas pour le dépôt en général.**
+Celle du 2026-08-05 portait sur un module de connexion modifié deux fois depuis (D-047,
+D-062) : trois documents écrivaient « éprouvée » alors que le code testé n'existait plus.
+Relevé en réaudit (D-067).
+
+| Étape | Résultat |
+| --- | --- |
+| Commit éprouvé | `c5ab166d` **plus les correctifs du réaudit** |
+| `pnpm db:backup` | 5600 octets, permissions `600` |
+| Cible avant restauration | base `postgres` : **aucune table** |
+| `pnpm db:restore <dump> --to local --yes` | terminée sans erreur |
+| Cible après | `Page`, `WebhookEvent`, `_prisma_migrations` — **3 migrations** |
+| Source `project0` | **intacte** |
+
+⚠️ **`--to local` ne vise pas la base de travail.** Il restaure dans la base `postgres` du
+conteneur, pas dans celle que désigne `DATABASE_URL`. C'est voulu — c'est ce qui permet de
+restaurer **ailleurs que sur la source**, seule répétition qui prouve la sauvegarde sans
+mettre en jeu ce qu'elle protège — mais aucun document ne le disait.
+
+## Répétition du 2026-08-05 (historique)
 
 Restaurer **ailleurs** que sur la source : c'est la seule répétition qui prouve la
 sauvegarde sans mettre en jeu ce qu'elle protège.

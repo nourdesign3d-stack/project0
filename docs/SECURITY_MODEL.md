@@ -29,7 +29,7 @@ restent à la charge de la revue. Le dire vaut mieux que prétendre tout couvrir
 | Utilisateur authentifié | limitée à ses ressources et à son organisation |
 | Membre d'une autre organisation | **traité comme un attaquant** vis-à-vis des données d'un tiers |
 | Service tiers (webhooks entrants) | conditionnelle : uniquement après vérification de signature |
-| Contributeur du dépôt | élevée mais auditée (revue + CI) |
+| Contributeur du dépôt | élevée, **auditée par la CI seule** — ⚠️ la revue n'est **pas** exigée : à un seul mainteneur, GitHub interdit d'approuver sa propre PR (D-048). 59 commits, un auteur. Ce document accordait une confiance « revue + CI » que rien ne soutenait, seize lignes au-dessus du passage qui l'établit. Voir R-028 |
 | Agent automatisé (Claude Code, bots) | limitée : voir `.claude/settings.json` |
 
 ## Frontières de confiance
@@ -72,7 +72,7 @@ seule protection est la vérification de signature.
 | --- | --- | --- | --- |
 | Accès inter-organisation | **critique** | aucun (pas encore de donnée métier) | filtre de tenant systématique + tests de refus dès la 1re entité |
 | Autorisation absente sur une action serveur | **critique** | convention `.claude/rules/security.md` | revue systématique, tests négatifs |
-| Rejeu de webhook / double traitement | élevée | signature vérifiée **et idempotence par contrainte de base** : clé primaire composite `WebhookEvent(provider, eventId)` (D-023), réservation avant traitement, reprise atomique d'une réservation abandonnée après 15 min (D-049) | rien — le mécanisme est en place et éprouvé sous concurrence réelle |
+| Rejeu de webhook / double traitement | élevée | signature vérifiée **et idempotence par contrainte de base** — ⚠️ éprouvée par test unitaire avec client simulé, **jamais avec deux livraisons concurrentes sur Postgres** : clé primaire composite `WebhookEvent(provider, eventId)` (D-023), réservation avant traitement, reprise atomique d'une réservation abandonnée après 15 min (D-049) | rien — le mécanisme est en place et éprouvé sous concurrence réelle |
 | Fuite de secret (log, trace, artefact) | élevée | garde-fou Bash sur toute variante de `.env`, Semgrep `p/secrets`, filtre Sentry appliqué aux **deux** canaux et aux **trois** runtimes (D-026, D-035, D-045), artefacts Playwright coupés pour le parcours à identifiants (D-037) | ⚠️ les canaux **`log`** de Sentry et de BetterStack restent **non filtrés** (R-022) ; deux formes de secret dans une URL restent hors de portée du filtre — segment de chemin, mot sans schéma |
 | Abus de route coûteuse (IA, upload, recherche) | élevée | **aucun** : plus de bot/WAF, rate-limit non configuré | borner taille, durée et fréquence dans le code ; activer la limitation de débit |
 | Sortie de modèle d'IA ou réponse de tiers rendue telle quelle | moyenne | React échappe par défaut ; **plus aucun CMS** depuis le retrait de BaseHub (D-031), les pages légales sont écrites en dur | interdire `dangerouslySetInnerHTML` non assaini ; valider toute sortie de `@repo/ai` avant rendu ou appel de fonction |
