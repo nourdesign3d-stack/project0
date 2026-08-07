@@ -9,22 +9,37 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const hook = join(dirname(fileURLToPath(import.meta.url)), "guard-bash.mjs");
 
-const check = (command) => {
+const check = (command, cwd) => {
   try {
     execFileSync(process.execPath, [hook], {
       input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
       stdio: ["pipe", "pipe", "pipe"],
+      ...(cwd ? { cwd } : {}),
     });
     return "autorisé";
   } catch (error) {
     return error.status === 2 ? "refusé" : `erreur(${error.status})`;
   }
 };
+
+/**
+ * Le verdict doit être **indépendant du dossier d'où la commande part**.
+ *
+ * ⚠️ Jusqu'au 2026-08-07, il ne l'était pas : l'exemption du bac à sable
+ * résolvait chaque argument depuis le dossier courant, si bien qu'un dépôt cloné
+ * sous `/tmp` ou `$TMPDIR` — un clone d'audit, un bac à sable d'agent — faisait
+ * résoudre tout argument relatif en zone temporaire et **désarmait les
+ * 26 règles**. Ces cas rejouent les mêmes commandes depuis un dossier
+ * temporaire : elles doivent être refusées exactement comme ailleurs.
+ */
+const sandbox = mkdtempSync(join(tmpdir(), "garde-fou-"));
 
 const cases = [
   // Lecture de secrets — toutes les variantes doivent être refusées.
@@ -195,6 +210,35 @@ const cases = [
   ["pnpm migrate --name init", "autorisé"],
 ];
 
+/**
+ * Cas rejoués **depuis un dossier temporaire**. Le troisième champ porte ce
+ * dossier ; sans lui, ces mêmes commandes passaient toutes.
+ */
+const sandboxCases = [
+  // Aucune de ces commandes n'a de chemin pour argument : les exempter parce que
+  // le dossier courant est temporaire n'avait aucun sens.
+  ["git push --force origin main", "refusé"],
+  ["git reset --hard HEAD~1", "refusé"],
+  ["git branch -D feat/x", "refusé"],
+  ["prisma db push", "refusé"],
+  ["prisma migrate reset", "refusé"],
+  ["docker compose down -v", "refusé"],
+  ["docker system prune", "refusé"],
+  ["vercel env pull", "refusé"],
+  ["printenv", "refusé"],
+  // Un chemin **relatif** ne prouve pas qu'on vise le bac à sable : il désigne
+  // ce que le dossier courant contient, c'est-à-dire ici le dépôt lui-même.
+  ["rm -rf docs", "refusé"],
+  ["rm -rf ./packages", "refusé"],
+  ["rm -rf .git", "refusé"],
+  // La lecture de secrets ne dépendait déjà pas du dossier — vérifié, pas supposé.
+  ["cat apps/app/.env.local", "refusé"],
+  // Ce que l'exemption doit continuer d'autoriser : un chemin absolu, dans la
+  // zone temporaire, pour une règle qui porte réellement sur des fichiers.
+  ["rm -rf /tmp/jetable", "autorisé"],
+  ["git status --short", "autorisé"],
+];
+
 let failures = 0;
 
 for (const [command, expected] of cases) {
@@ -207,10 +251,24 @@ for (const [command, expected] of cases) {
   }
 }
 
+for (const [command, expected] of sandboxCases) {
+  const actual = check(command, sandbox);
+  if (actual !== expected) {
+    failures += 1;
+    process.stdout.write(
+      `  ✗ [depuis ${sandbox}] ${command}\n      attendu : ${expected}, obtenu : ${actual}\n`
+    );
+  }
+}
+
+rmSync(sandbox, { recursive: true, force: true });
+
+const total = cases.length + sandboxCases.length;
+
 process.stdout.write(
   failures === 0
-    ? `  ${cases.length} cas vérifiés, aucun écart.\n`
-    : `  ${failures} écart(s) sur ${cases.length} cas.\n`
+    ? `  ${total} cas vérifiés, aucun écart.\n`
+    : `  ${failures} écart(s) sur ${total} cas.\n`
 );
 
 process.exit(failures === 0 ? 0 : 1);
