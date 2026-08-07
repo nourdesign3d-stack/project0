@@ -87,6 +87,8 @@ Ports : `app` 3000, `web` 3001, `api` 3002, `email` 3003, `docs` 3004, `studio` 
 - `/review-change` — revue indépendante d'un diff.
 - `/blind-spot-review` — recherche contradictoire des angles morts.
 - `/release-readiness` — vérification avant livraison.
+- `/vibe0` — démarrer un produit : constater l'amorçage, définir le domaine, réduire la surface,
+  écrire la première entité (commande `.claude/commands/vibe0.md`).
 - `/vibe` — audit du respect des principes du projet (commande `.claude/commands/vibe.md`).
 - `/next-forge` — référence du template (fournie par next-forge).
 
