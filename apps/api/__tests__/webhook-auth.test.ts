@@ -16,6 +16,8 @@ const verify = vi.fn();
 const logInfo = vi.fn();
 const createEvent = vi.fn();
 const deleteEvent = vi.fn();
+const updateEvent = vi.fn();
+const updateManyEvents = vi.fn();
 
 const duplicate = () => Object.assign(new Error("unique"), { code: "P2002" });
 
@@ -26,6 +28,8 @@ vi.mock("@repo/database", () => ({
     webhookEvent: {
       create: (...args: unknown[]) => createEvent(...args),
       delete: (...args: unknown[]) => deleteEvent(...args),
+      update: (...args: unknown[]) => updateEvent(...args),
+      updateMany: (...args: unknown[]) => updateManyEvents(...args),
     },
   },
 }));
@@ -58,6 +62,7 @@ vi.mock("@repo/auth/server", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: {
     info: (...args: unknown[]) => logInfo(...args),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
@@ -94,6 +99,10 @@ describe("webhook Clerk", () => {
     createEvent.mockResolvedValue(undefined);
     deleteEvent.mockReset();
     deleteEvent.mockResolvedValue(undefined);
+    updateEvent.mockReset();
+    updateEvent.mockResolvedValue(undefined);
+    updateManyEvents.mockReset();
+    updateManyEvents.mockResolvedValue({ count: 0 });
   });
 
   test("refuse une requête sans en-têtes Svix", async () => {
@@ -181,5 +190,49 @@ describe("webhook Clerk", () => {
 
     expect(journal).not.toContain("a@b.c");
     expect(journal).not.toContain("email_addresses");
+  });
+
+  test("marque la livraison terminée après un traitement réussi", async () => {
+    // Sans ce marquage, la réservation reste indistinguable d'un traitement
+    // interrompu : elle sera reprise après péremption (D-049).
+    verify.mockReturnValue({
+      type: "user.created",
+      data: {
+        id: "user_1",
+        created_at: 1,
+        email_addresses: [],
+        phone_numbers: [],
+      },
+    });
+
+    await post("{}", SIGNED_HEADERS);
+
+    expect(updateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { provider_eventId: { provider: "clerk", eventId: "msg_1" } },
+      })
+    );
+  });
+
+  test("reprend une réservation abandonnée", async () => {
+    // Un processus interrompu entre la réservation et la fin laissait une
+    // réservation que rien ne libérait : le réessai passait pour un doublon et
+    // l'événement était perdu, alors que Clerk avait reçu un 200 (D-049).
+    createEvent.mockRejectedValue(duplicate());
+    updateManyEvents.mockResolvedValue({ count: 1 });
+    verify.mockReturnValue({
+      type: "user.created",
+      data: {
+        id: "user_1",
+        created_at: 1,
+        email_addresses: [],
+        phone_numbers: [],
+      },
+    });
+
+    const response = await post("{}", SIGNED_HEADERS);
+
+    expect(response.status).toBeLessThan(300);
+    expect(await response.text()).not.toContain("duplicate");
   });
 });

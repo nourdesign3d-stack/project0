@@ -18,6 +18,26 @@ const WebhooksPage = async () => {
     notFound();
   }
 
+  /**
+   * Dégradation explicite plutôt qu'erreur serveur : dans l'installation par
+   * défaut, aucun jeton Svix n'existe et `getAppPortal()` lève. La page
+   * affichait alors une erreur — un service optionnel non configuré ne doit pas
+   * casser la page qui le porte (D-051).
+   */
+  if (!webhooks.isConfigured()) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h2 className="font-semibold text-lg">Webhooks non configurés</h2>
+          <p className="mt-2 text-muted-foreground text-sm">
+            Renseigner <code>SVIX_TOKEN</code> pour activer le portail d'envoi.
+            Voir <code>docs/DEPLOYMENT.md</code>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const response = await webhooks.getAppPortal();
 
   if (!response?.url) {

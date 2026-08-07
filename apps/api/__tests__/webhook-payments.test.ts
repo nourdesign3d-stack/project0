@@ -27,6 +27,8 @@ const logError = vi.fn();
 const getUserList = vi.fn();
 const createEvent = vi.fn();
 const deleteEvent = vi.fn();
+const updateEvent = vi.fn();
+const updateManyEvents = vi.fn();
 
 const duplicate = () => Object.assign(new Error("unique"), { code: "P2002" });
 
@@ -37,6 +39,8 @@ vi.mock("@repo/database", () => ({
     webhookEvent: {
       create: (...args: unknown[]) => createEvent(...args),
       delete: (...args: unknown[]) => deleteEvent(...args),
+      update: (...args: unknown[]) => updateEvent(...args),
+      updateMany: (...args: unknown[]) => updateManyEvents(...args),
     },
   },
 }));
@@ -125,6 +129,10 @@ describe("webhook Stripe", () => {
     createEvent.mockResolvedValue(undefined);
     deleteEvent.mockReset();
     deleteEvent.mockResolvedValue(undefined);
+    updateEvent.mockReset();
+    updateEvent.mockResolvedValue(undefined);
+    updateManyEvents.mockReset();
+    updateManyEvents.mockResolvedValue({ count: 0 });
   });
 
   test("refuse une requête sans en-tête de signature", async () => {
@@ -319,5 +327,79 @@ describe("webhook Stripe", () => {
     expect(capture).toHaveBeenCalledWith(
       expect.objectContaining({ distinctId: "user_cible" })
     );
+  });
+
+  test("marque l'événement terminé après un traitement réussi", async () => {
+    // Sans ce marquage, la réservation reste indistinguable d'un traitement
+    // interrompu : elle sera reprise après péremption et l'événement traité
+    // deux fois (D-049).
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    expect(updateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { provider_eventId: { provider: "stripe", eventId: "evt_1" } },
+      })
+    );
+  });
+
+  test("ne marque rien terminé quand le traitement échoue", async () => {
+    getUserList.mockRejectedValue(new Error("Clerk injoignable"));
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    expect(updateEvent).not.toHaveBeenCalled();
+    expect(deleteEvent).toHaveBeenCalled();
+  });
+
+  test("reprend une réservation abandonnée", async () => {
+    // Un processus interrompu entre la réservation et la fin — redéploiement,
+    // délai dépassé — laissait une réservation que rien ne libérait : le réessai
+    // du fournisseur passait pour un doublon et l'événement était perdu, alors
+    // que le fournisseur avait reçu un 200 (D-049).
+    createEvent.mockRejectedValue(duplicate());
+    updateManyEvents.mockResolvedValue({ count: 1 });
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+    const response = await post(body, { "stripe-signature": sign(body) });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain("duplicate");
+    // Le traitement a bien eu lieu : c'est ce qui distingue une reprise d'un
+    // acquittement muet.
+    expect(getUserList).toHaveBeenCalled();
+  });
+
+  test("ne reprend pas une réservation récente ni un événement terminé", async () => {
+    // La reprise ne doit s'appliquer qu'aux réservations périmées : sinon deux
+    // livraisons simultanées se marcheraient dessus.
+    createEvent.mockRejectedValue(duplicate());
+    updateManyEvents.mockResolvedValue({ count: 0 });
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+    const response = await post(body, { "stripe-signature": sign(body) });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("duplicate");
+    expect(getUserList).not.toHaveBeenCalled();
+  });
+
+  test("la reprise ne porte que sur les réservations non terminées et périmées", async () => {
+    createEvent.mockRejectedValue(duplicate());
+    updateManyEvents.mockResolvedValue({ count: 1 });
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    const [{ where }] = updateManyEvents.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
+
+    expect(where.completedAt).toBeNull();
+    expect(where.receivedAt).toHaveProperty("lt");
   });
 });

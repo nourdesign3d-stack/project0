@@ -28,10 +28,23 @@ model Page {
 /// course, pas une garantie — voir .claude/rules/database.md.
 model WebhookEvent {
   /// Fournisseur émetteur : "clerk", "stripe"…
-  provider   String
+  provider    String
   /// Identifiant de **livraison** du fournisseur, stable d'un réessai à l'autre.
-  eventId    String
-  receivedAt DateTime @default(now())
+  eventId     String
+  /// Instant de la **réservation**, remis à jour lors d'une reprise (voir D-049).
+  receivedAt  DateTime  @default(now())
+  /// Instant où le traitement s'est **terminé avec succès**. `null` = réservé,
+  /// pas encore abouti.
+  ///
+  /// Sans cette colonne, une ligne signifiait seulement « vu ». Un processus
+  /// interrompu entre la réservation et la fin — redéploiement, délai dépassé,
+  /// arrêt du conteneur — laissait donc une réservation que rien ne libérait :
+  /// le réessai du fournisseur était pris pour un doublon et l'événement perdu
+  /// en silence. Voir D-049.
+  completedAt DateTime?
 
   @@id([provider, eventId])
+  /// Sert la purge par ancienneté **et** la reprise des réservations abandonnées.
+  /// Sans lui, les deux balaient la table entière à chaque passage.
+  @@index([receivedAt])
 }

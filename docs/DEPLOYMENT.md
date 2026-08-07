@@ -151,6 +151,19 @@ depuis le `.env` racine. Il **n'écrase jamais** un fichier existant sans `--for
 
 Sans elles, le démarrage et le build échouent — comportement voulu.
 
+> ⚠️ **`DATABASE_URL` sur Neon : utiliser le point d'accès « pooler ».** Le pilote est
+> `@prisma/adapter-pg`, un client Postgres ordinaire (D-021) : il ouvre une connexion par
+> instance. Les fonctions serverless en démarrent beaucoup et les libèrent mal — sans le
+> pooler, la limite de connexions du plan est atteinte bien avant la charge réelle, et
+> l'erreur (`too many connections`) survient sous trafic, jamais en test.
+>
+> Vérifié le 2026-08-05 (D-025) : connexion, migrations et requêtes applicatives passent
+> toutes par le pooler, **sans** `directUrl`. Le point d'accès direct ne sert qu'aux
+> outils qui exigent une session persistante.
+>
+> Cette contrainte était consignée dans `DECISIONS.md` — c'est-à-dire nulle part pour qui
+> renseigne une variable. Elle est ici parce que c'est ici qu'on la lit (D-053).
+
 ### Requise si le cron est utilisé
 
 | Variable | Format | Conséquence si absente |

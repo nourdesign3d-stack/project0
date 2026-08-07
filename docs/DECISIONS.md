@@ -111,6 +111,133 @@ seul outil de graphe.
 
 ---
 
+## D-053 — La contrainte du pooler Neon est écrite là où on la lit
+
+**Date** : 2026-08-07
+**Contexte** : D-025 établissait qu'il faut employer le point d'accès « pooler » de Neon
+— le pilote est un client Postgres ordinaire (D-021), il ouvre une connexion par
+instance, et les fonctions serverless en démarrent beaucoup. Cette contrainte vivait
+dans `DECISIONS.md`, c'est-à-dire **nulle part pour qui renseigne une variable**.
+
+Elle figure désormais dans `DEPLOYMENT.md`, à côté de `DATABASE_URL`. Le coût de
+l'oubli est asymétrique : l'erreur (`too many connections`) survient **sous trafic**,
+jamais en test, et la limite du plan est atteinte bien avant la charge réelle.
+
+---
+
+## D-052 — Sentry ne reçoit plus le bruit que l'appelant contrôle
+
+**Date** : 2026-08-07
+**Contexte** : `parseError` appelait `Sentry.captureException` **systématiquement**. Sur
+une frontière publique, cela signifiait un événement Sentry par signature de webhook
+refusée — donc un par appel forgé.
+
+Sur un dépôt sans limitation de débit (R-003), tout appelant anonyme pouvait ainsi
+remplir le quota Sentry du projet, et surtout **noyer les vraies erreurs sous du bruit
+qu'il choisit**. Un outil de diagnostic qu'un tiers peut saturer cesse d'être un outil
+de diagnostic.
+
+`parseError(error, { expected: true })` marque une erreur **attendue** : refus de
+validation, signature invalide, entrée malformée. Elle reste journalisée — le refus doit
+se voir — sans devenir un incident. Le défaut reste `false` : oublier l'option remonte
+l'erreur, ce qui est le sens le moins dangereux des deux.
+
+**Et la contrepartie, enfin payée.** `.claude/rules/security.md` exige depuis R-018 que
+chaque frontière serveur journalise un **identifiant de corrélation**, compensation du
+bridage de Sentry (ni corps, ni en-têtes, ni variables locales). Aucune ne le faisait.
+Les deux webhooks posent désormais `webhook.provider` et `webhook.event_id` sur la trace
+— pour Clerk, le `svix-id`, celui que porte aussi le tableau de bord du fournisseur.
+Sans ce point commun, un incident vu dans Sentry ne peut être rapproché ni du journal ni
+de la livraison chez le fournisseur.
+
+---
+
+## D-051 — Une fonctionnalité non configurée se dégrade au lieu de casser sa page
+
+**Date** : 2026-08-07
+**Contexte** : `getAppPortal()` **lève** quand `SVIX_TOKEN` est absent, et rien ne
+rattrapait cette exception. Dans l'installation par défaut — celle de **tout** projet
+dérivé de la graine, où aucun jeton Svix n'existe — ouvrir `/webhooks` produisait une
+erreur serveur.
+
+La page affiche désormais un état « non configuré » nommant la variable à renseigner.
+`webhooks.isConfigured()` porte la question, plutôt qu'un `try`/`catch` autour d'un
+appel dont on ne saurait pas distinguer les causes d'échec.
+
+`send()` continue de lever, et c'est voulu : un envoi silencieusement ignoré serait pire
+qu'un échec. **La distinction est entre afficher et agir.**
+
+---
+
+## D-050 — La tâche planifiée ne dépend plus du modèle de démonstration
+
+**Date** : 2026-08-07
+**Contexte** : `keep-alive` réveillait la connexion par `database.page.count()`. Or
+`Page` est le modèle de **démonstration** que `DOMAIN_MODEL.md` prescrit explicitement de
+supprimer.
+
+Le jour où quelqu'un suit cette consigne, la tâche cesse de compiler et la base retombe
+en veille — sans qu'aucun document ne relie les deux gestes. Une consigne du dépôt
+cassait donc une autre partie du dépôt.
+
+`SELECT 1` ne suppose rien du contenu de la base. C'est le **seul** usage de SQL brut du
+dépôt : requête littérale, aucune interpolation, rien de ce qui vient de la requête HTTP
+n'y entre. Un test exige que la requête reste exactement `SELECT 1` — tout ce qui nomme
+une table réintroduirait le couplage.
+
+---
+
+## D-049 — Une réservation abandonnée bloquait l'événement pour toujours
+
+**Date** : 2026-08-07
+**Migration** : `20260807095046_webhook_event_completion` (expand : colonne nullable +
+index).
+
+**Contexte** : une ligne de `WebhookEvent` signifiait seulement « vu ». Un processus
+interrompu **entre** la réservation et la fin — redéploiement, délai dépassé, arrêt du
+conteneur — laissait donc une réservation que rien ne libérait. Le réessai du
+fournisseur était pris pour un doublon, et l'événement perdu en silence : le fournisseur
+avait reçu un `200`, il ne réessaierait plus.
+
+Ni `releaseEvent` ni aucun autre dispositif ne pouvait rattraper ce cas, puisque le
+processus qui aurait dû libérer n'existait plus. C'est le troisième chemin de perte
+silencieuse identifié par l'audit (TR-2102), et le seul qu'aucun correctif applicatif ne
+pouvait couvrir.
+
+**`completedAt` distingue réservé de terminé.** Une réservation non aboutie depuis plus
+de quinze minutes est reprise. Ce délai est très au-delà de la durée d'un traitement
+(quelques secondes) et en deçà de la fenêtre de réessai des fournisseurs : trop court,
+deux livraisons simultanées se marcheraient dessus ; trop long, l'événement resterait
+bloqué au-delà des réessais et serait perdu pour de bon.
+
+La reprise est **atomique** — filtre et écriture dans un seul `updateMany`. Un
+`findUnique` suivi d'un `update` serait une course, pas un contrôle : deux livraisons
+simultanées liraient toutes deux « périmée » avant que l'une n'écrive.
+
+**Et la table est enfin bornée.** `WebhookEvent` ne croissait que — une ligne par
+livraison, jamais supprimée. Rien ne l'aurait signalé : c'est le genre de dette qui ne se
+manifeste qu'en production, tard, sous la forme d'une latence inexpliquée. Une tâche
+planifiée purge à 30 jours, au-delà de la fenêtre de réessai de tous les fournisseurs
+(Stripe 3 jours, Svix environ 5) : passé ce délai, aucun rejeu légitime ne peut plus
+arriver.
+
+⚠️ **Seules les lignes terminées sont purgées.** Une réservation jamais aboutie est une
+anomalie : la supprimer effacerait la trace du seul incident qui mérite d'être vu. Elle
+est comptée et journalisée.
+
+**Sur la migration.** Elle est *expand* : colonne nullable et index, aucune donnée
+réécrite, aucune colonne supprimée. Elle s'applique donc avant le code qui l'utilise, et
+le code d'avant fonctionne sans elle — le retour arrière est possible sans perte.
+`completedAt` NULL sur les lignes existantes signifie « issue inconnue », ce qui est la
+valeur juste : prétendre le contraire les rendrait à tort non rejouables. Conséquence
+assumée : ces lignes deviendront rejouables passé le délai de reprise — sans effet sur
+une graine sans trafic réel.
+
+**Vérifiée sur la base locale** : migration appliquée, `\d "WebhookEvent"` confirme la
+colonne et l'index `WebhookEvent_receivedAt_idx`, `migrate:status` à jour.
+
+---
+
 ## D-039 — Deux promesses que le code ne tenait pas
 
 **Date** : 2026-08-06
