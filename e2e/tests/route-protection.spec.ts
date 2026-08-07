@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import {
   collectRoutes,
+  isDynamic,
   PUBLIC_ROUTES,
   toUrlPath,
 } from "../../apps/app/__tests__/routes";
@@ -27,14 +28,38 @@ const REFUSALS = [401, 403, 404];
 const METHOD_NOT_ALLOWED = 405;
 const SIGN_IN_LOCATION = /sign-in|sign-up|accounts\.dev/;
 
-const protectedRoutes = collectRoutes(APP_DIR)
-  .filter((route) => !PUBLIC_ROUTES.includes(route))
-  .map(toUrlPath);
+const candidates = collectRoutes(APP_DIR).filter(
+  (route) => !PUBLIC_ROUTES.includes(route)
+);
+
+/**
+ * Routes dynamiques : aucune valeur de paramètre ne peut être devinée, donc
+ * aucune URL réelle ne peut être formée. Elles sont **déclarées non couvertes**
+ * plutôt que testées sur une URL inexistante — un `404` sur `/items` prouverait
+ * seulement que `/items` n'existe pas, pas que `/items/42` refuse.
+ *
+ * Le jour où la première apparaît, ce test échoue et demande une décision :
+ * fournir une valeur d'exemple, ou assumer explicitement l'absence de contrôle.
+ */
+const uncovered = candidates.filter(isDynamic);
+
+const protectedRoutes = candidates
+  .map(toUrlPath)
+  .filter((path): path is string => path !== null);
 
 test("l'inventaire des routes protégées n'est pas vide", () => {
   // Sans cela, une erreur d'énumération rendrait toute la suite verte en
   // n'interrogeant rien.
   expect(protectedRoutes.length).toBeGreaterThan(0);
+});
+
+test("aucune route dynamique n'échappe silencieusement au contrôle", () => {
+  expect(
+    uncovered,
+    "route(s) dynamique(s) non couverte(s) : fournir une valeur de paramètre " +
+      "d'exemple pour les interroger réellement, ou assumer l'absence de " +
+      "contrôle d'exécution en le déclarant"
+  ).toEqual([]);
 });
 
 for (const path of protectedRoutes) {

@@ -21,8 +21,6 @@ const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "app");
  * en marche.
  */
 
-const LAYOUT_FILE = "layout.tsx";
-
 /**
  * Un contrôle d'autorisation, c'est interroger la session côté serveur.
  * Volontairement large : mieux vaut accepter un contrôle exotique que se
@@ -38,24 +36,25 @@ const readIfPresent = (path: string): string => {
   }
 };
 
-/** Le contrôle peut vivre dans la route, ou dans n'importe quel layout parent. */
-const isProtected = (routePath: string): boolean => {
-  if (AUTHORIZATION_CHECK.test(readIfPresent(routePath))) {
-    return true;
-  }
-
-  let directory = dirname(routePath);
-
-  while (directory.startsWith(APP_DIR)) {
-    if (AUTHORIZATION_CHECK.test(readIfPresent(join(directory, LAYOUT_FILE)))) {
-      return true;
-    }
-
-    directory = dirname(directory);
-  }
-
-  return false;
-};
+/**
+ * Le contrôle doit vivre **dans le fichier de la route**, jamais dans un layout
+ * parent. Deux raisons, toutes deux constatées :
+ *
+ * 1. Un `route.ts` **n'exécute jamais** `layout.tsx` — les layouts appartiennent
+ *    au rendu React, pas au traitement d'une requête HTTP. Un audit externe a
+ *    posé un `route.ts` sans contrôle sous `(authenticated)` : le test restait
+ *    vert et la route répondait **200 à un appel anonyme** en production.
+ *
+ * 2. Même pour une page, un layout n'est pas une autorisation : Next évalue
+ *    pages et layouts **en parallèle**, donc une lecture de données peut partir
+ *    avant la redirection du layout. La règle du dépôt le dit déjà — « au plus
+ *    près de l'accès aux données » — le test ne la faisait pas respecter.
+ *
+ * Créditer le layout rendait le contrôle inopérant : toute route sous
+ * `(authenticated)` était réputée protégée, quel que soit son contenu (D-033).
+ */
+const isProtected = (routePath: string): boolean =>
+  AUTHORIZATION_CHECK.test(readIfPresent(routePath));
 
 const routes = collectRoutes(APP_DIR);
 
