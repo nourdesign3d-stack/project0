@@ -50,7 +50,8 @@ describe("artefacts Playwright", () => {
         expect(
           content,
           `${spec} lit des identifiants sans désactiver les artefacts : ` +
-            `ajouter test.use({ ${DISABLED.join(", ")} }) au bloc concerné`
+            `ajouter test.use({ ${DISABLED.join(", ")} }) en tête de fichier — ` +
+            "video et screenshot sont des options de worker, refusées dans un describe"
         ).toContain(directive);
       }
     });
