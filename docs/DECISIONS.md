@@ -149,6 +149,74 @@ la protection de `main`.
 
 ---
 
+## D-060 — Chaque risque porte désormais un déclencheur de réexamen
+
+**Date** : 2026-08-07
+**Contexte** : les 27 risques portaient « à désigner » comme propriétaire. Remplir cette
+colonne sur un projet à une personne paraît absurde — le nom serait toujours le même.
+
+**Ce n'est pas le nom qui manquait, c'est le déclencheur.** R-011 en est la
+démonstration : il est resté marqué « accepté » deux jours après que sa cause — un plan
+GitHub gratuit sur dépôt privé — avait disparu, parce que personne n'avait la charge de le
+rouvrir. Un risque sans propriétaire n'est réexaminé par personne ; un risque avec un
+propriétaire mais sans déclencheur non plus.
+
+**Trois familles seulement**, et chaque ligne porte l'événement qui doit la faire
+ressortir :
+
+| Propriétaire | Ce que cela veut dire | Exemples |
+| --- | --- | --- |
+| `propriétaire produit` | la décision n'attend pas du code, elle attend un arbitrage | R-001, R-004, R-009, R-024, R-025 |
+| `propriétaire du dépôt` | gouvernance du dépôt et de ses accès | R-011, R-016 |
+| `technique` | se traite au fil du code | les vingt autres |
+
+Les déclencheurs sont de deux natures : une **date** quand elle existe (`chokidar`
+2026-11-05, `semver` 2026-11-07, montée de `pg` en 9) ou l'**événement** qui rend le
+risque à nouveau actuel (« à chaque route publique ajoutée », « avant le 1er utilisateur
+réel », « à chaque relation ajoutée au schéma »).
+
+C'est la partie qui a de la valeur : elle transforme un registre qu'on relit par
+conscience en un registre qui **vient à vous** au moment où il compte.
+
+---
+
+## D-059 — La politique de sauvegarde est décidée, et le proxy d'analytique ne pointe plus vers la mauvaise juridiction
+
+**Date** : 2026-08-07
+**Décidé par** : propriétaire du produit.
+
+**Politique de sauvegarde** — R-004 ouvert depuis l'initialisation, H-008 levée. Deux
+régimes, parce que la tolérance change le jour où les données ne vous appartiennent plus :
+RPO 24 h puis **1 h** au premier client, RTO 24 h puis **4 h**, rétention 30 jours
+glissants plus 12 mensuelles, répétition trimestrielle.
+
+Deux points comptent plus que les chiffres, et sont écrits comme tels :
+
+- **l'emplacement doit être hors de l'hébergeur de la base.** Une sauvegarde chez le même
+  hébergeur ne protège que d'une erreur de manipulation, pas de la perte du compte ;
+- **le PITR n'est pas une sauvegarde**, c'est un historique. C'est la fenêtre du plan qui
+  fixe réellement le RPO, pas l'intention écrite.
+
+⚠️ **Décidée n'est pas appliquée.** Cinq étapes restent : vérifier la fenêtre PITR,
+choisir l'emplacement, automatiser, poser une **alerte d'échec** — une sauvegarde qui
+échoue en silence donne l'assurance sans le contenu —, et planifier la première
+répétition. `RECOVERY.md` le dit ligne à ligne plutôt que de laisser croire que la
+décision suffit.
+
+**Proxy PostHog.** Le proxy `/ingest` — qui existe pour que la mesure ne soit pas
+silencieusement amputée par les bloqueurs — était **codé en dur sur la région
+États-Unis**. Pour un projet dont les données doivent rester dans l'Union européenne, il
+expédiait donc l'intégralité du trafic mesuré vers la mauvaise juridiction, sans que rien
+ne l'indique. `POSTHOG_REGION` la rend explicite, **défaut `eu`** : un mauvais défaut de
+localisation coûte plus cher qu'un défaut inutile.
+
+**Pages légales.** Ce qui est vérifiable dans le dépôt y est désormais écrit — liste des
+destinataires, catégories de données, durées de conservation. Le reste est marqué « à
+compléter » et le bandeau, réécrit, distingue les deux. Il ne dit plus « modèle non
+rédigé » mais « non relu par un juriste », ce qui est la vraie limite.
+
+---
+
 ## D-058 — Deux tests qui ne pouvaient pas échouer
 
 **Date** : 2026-08-07

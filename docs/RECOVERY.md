@@ -76,18 +76,67 @@ interrompre la base courante. La rétention dépend du forfait, et **n'a pas ét
 Un dump reste nécessaire malgré cela : il survit à la perte du compte chez l'hébergeur, ce
 qu'aucune fonction interne à cet hébergeur ne peut faire.
 
-## Ce qui reste à décider
+## Politique de sauvegarde
 
-Ces points n'ont pas de bonne réponse générique — ils dépendent de ce que le produit peut
-se permettre de perdre. Tant qu'ils ne sont pas tranchés, R-004 reste ouvert.
+**Décidée le 2026-08-07** par le propriétaire du produit. Elle ferme R-004 et retire
+H-008.
 
-| Décision | Question à trancher |
+Deux régimes, parce que la tolérance change radicalement le jour où des données ne vous
+appartiennent plus.
+
+| | **Avant le premier utilisateur réel** | **Dès le premier client** |
+| --- | --- | --- |
+| **RPO** — perte de données acceptable | 24 h | **1 h** |
+| **RTO** — indisponibilité acceptable | 24 h | **4 h** |
+| Fréquence | 1 sauvegarde par jour | historique PITR **+** 1 sauvegarde par jour |
+| Rétention | 30 jours | 30 jours glissants **+** 1 mensuelle gardée 12 mois |
+| Emplacement | **hors de l'hébergeur de la base** | **hors de l'hébergeur de la base** |
+| Répétition de restauration | 1 fois par trimestre | 1 fois par trimestre |
+| Responsable | propriétaire du produit | propriétaire du produit |
+
+### Ce qui compte le plus n'est pas un chiffre
+
+**L'emplacement.** Une sauvegarde qui vit chez le même hébergeur que la base ne protège
+que d'une erreur de manipulation. Elle ne protège pas de la perte du compte — facturation
+impayée, suspension, compromission des identifiants de l'hébergeur. Il faut une copie
+ailleurs : un autre fournisseur de stockage, ou un disque chiffré au début.
+
+**Le PITR n'est pas une sauvegarde**, c'est un historique. Excellent pour rattraper une
+suppression accidentelle à 14 h 03 ; inutile si le compte disparaît. Les deux sont
+complémentaires, jamais interchangeables.
+
+⚠️ **C'est la rétention d'historique du plan qui fixe réellement le RPO**, pas l'intention
+écrite ici. Un RPO d'1 h avec une sauvegarde quotidienne n'est tenable que si le PITR
+couvre l'intervalle. Vérifier la fenêtre offerte par le plan **avant** de s'engager sur ce
+chiffre : quelques heures sur les offres gratuites, plusieurs jours au-delà.
+
+### Mise en place
+
+1. **Vérifier la fenêtre PITR du plan** de l'hébergeur de base. Si elle est inférieure au
+   RPO visé, le RPO réel est celui du plan — corriger ce document plutôt que d'y croire.
+2. **Choisir l'emplacement hors hébergeur** et le noter ici.
+3. **Automatiser la sauvegarde quotidienne** : `pnpm db:backup` produit un fichier en
+   `600`. L'automatisation (tâche planifiée, exécution CI dédiée) doit y ajouter le
+   transfert vers l'emplacement choisi — sans quoi la sauvegarde reste sur la machine qui
+   la produit.
+4. **Poser une alerte d'échec.** Une sauvegarde qui échoue en silence est pire que pas de
+   sauvegarde : elle donne l'assurance sans le contenu. C'est le point le plus souvent
+   oublié.
+5. **Inscrire la première répétition à l'agenda** — trimestrielle, procédure ci-dessus,
+   restauration **ailleurs** que sur la source.
+
+### État de la mise en place
+
+| Étape | État |
 | --- | --- |
-| Fréquence | quelle quantité de données peut-on perdre (RPO) ? |
-| Rétention | combien de temps garde-t-on les sauvegardes, et où ? |
-| Emplacement | une sauvegarde sur la même machine que la base ne protège de rien |
-| Délai de reprise | en combien de temps doit-on être revenu en service (RTO) ? |
-| Responsable | qui vérifie que les sauvegardes existent et qui répète la restauration ? |
-| Fréquence de répétition | une procédure non rejouée redevient non testée |
+| Mécanisme (`db:backup` / `db:restore`) | **fait et éprouvé** (D-027) |
+| Politique (chiffres ci-dessus) | **décidée le 2026-08-07** |
+| Vérification de la fenêtre PITR | **à faire** |
+| Emplacement hors hébergeur | **à choisir** |
+| Automatisation quotidienne | **à faire** |
+| Alerte d'échec | **à faire** |
+| Première répétition trimestrielle | **à planifier** |
 
-Voir `docs/ASSUMPTIONS.md` (H-008) et `docs/RISKS.md` (R-004).
+Tant que les cinq dernières lignes ne sont pas faites, **la politique existe mais n'est
+pas appliquée** — et il faut le dire ainsi, pas se contenter d'avoir écrit les chiffres.
+Suivi : R-004.

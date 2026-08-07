@@ -49,8 +49,12 @@ export const LegalPage = ({
  */
 export const Placeholder = () => (
   <div className="not-prose mb-10 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
-    <strong>Modèle non rédigé.</strong> Cette page décrit la structure attendue,
-    pas un engagement. Le texte reste à écrire et à faire relire avant toute
-    mise en service. Voir <code>docs/RISKS.md</code>, R-024.
+    <strong>Texte non relu par un juriste.</strong> Les éléments factuels —
+    liste des prestataires, catégories de données, durées de conservation —
+    décrivent ce que le service fait réellement. Les passages marqués{" "}
+    <em>« à compléter »</em> dépendent de l'entité qui exploite le service et
+    des fonctionnalités, et ne sont pas encore définis. Cette page{" "}
+    <strong>n'engage pas</strong> tant qu'elle n'a pas été complétée et relue.
+    Voir <code>docs/RISKS.md</code>, R-024.
   </div>
 );
