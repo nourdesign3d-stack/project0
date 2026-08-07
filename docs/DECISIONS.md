@@ -111,6 +111,42 @@ seul outil de graphe.
 
 ---
 
+## D-041 — La libération d'une réservation avalait toute erreur
+
+**Date** : 2026-08-07
+**Contexte** : `releaseEvent` se terminait par `.catch(() => undefined)`. Toute erreur
+de suppression — base injoignable, délai dépassé — disparaissait sans trace.
+
+Or **l'échec de cette fonction produit précisément la perte qu'elle existe pour
+empêcher**. Enchaînement complet : le traitement du webhook échoue, la libération
+échoue aussi, la réservation survit ; le fournisseur réessaie, la réservation le fait
+passer pour un doublon, et l'événement est acquitté sans avoir jamais été traité. Le
+fournisseur, lui, a vu un `200` : il ne réessaiera plus.
+
+Aucun dispositif du système ne peut le signaler — ni métrique, ni alerte, ni contrôle
+de santé. C'est ce que l'audit du 2026-08-07 a nommé la perte silencieuse d'un
+événement de paiement.
+
+**Deux cas, désormais distingués.** `P2025` — la ligne n'existe pas — est sans
+conséquence et attendu si deux chemins libèrent le même événement : ignoré. Tout le
+reste est **journalisé avec le fournisseur et l'identifiant d'événement**, les deux
+seuls éléments permettant de retrouver ce qui a été perdu chez le fournisseur et de le
+rejouer à la main.
+
+L'erreur n'est pas propagée : l'appelant est déjà dans son chemin d'échec, et la
+masquer d'une seconde erreur ne l'aiderait pas.
+
+**Preuve.** Deux tests : l'un exige que le journal porte `stripe` et `evt_1` quand la
+suppression échoue — vu échouer sur le code d'avant (`1 failed | 15 passed`) ; l'autre
+exige le silence sur `P2025`, pour que la correction ne devienne pas du bruit.
+
+**Ce que ce défaut enseigne** : `.catch(() => undefined)` est la forme la plus compacte
+d'un renoncement. Ici il occupait une ligne, sous un commentaire de quatre lignes
+expliquant que perdre un événement en silence était « exactement ce que l'idempotence
+est censée éviter ». Même famille que D-039.
+
+---
+
 ## D-040 — Le garde-fou Bash se désarmait tout seul sous /tmp
 
 **Date** : 2026-08-07
