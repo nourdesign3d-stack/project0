@@ -24,13 +24,6 @@ datasource db {
 // donc aucune contrainte à créer, donc aucune migration. Il aurait coûté une
 // reprise de données au premier modèle métier.
 
-// This is a stub model.
-// Delete it and add your own Prisma models.
-model Page {
-  id   Int    @id @default(autoincrement())
-  name String
-}
-
 /// Événements de webhook déjà traités — garantit l'idempotence (R-012).
 ///
 /// Ce modèle n'est **pas** du domaine : il est d'infrastructure, et ne suppose

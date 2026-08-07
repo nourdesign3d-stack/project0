@@ -41,6 +41,13 @@ sont obligatoires.
   exige : sauvegarde vérifiée, plan de retour, validation explicite du propriétaire.
 - Une migration doit être relisible : pas de SQL généré non compris, pas de suppression
   « au passage ».
+- ⚠️ **Une migration appliquée ne se modifie plus, pas même pour y ajouter un commentaire.**
+  Prisma en mémorise la somme de contrôle : toute retouche fait échouer la migration
+  suivante avec « was modified after it was applied », et la seule issue proposée est
+  `migrate reset` — c'est-à-dire la perte de la base de développement. Constaté le
+  2026-08-07 : un commentaire explicatif ajouté après coup a bloqué la migration suivante
+  (D-070). **Le « pourquoi » d'une migration s'écrit dans `docs/DECISIONS.md`**, qui n'a
+  pas de somme de contrôle.
 
 ## Écritures applicatives
 

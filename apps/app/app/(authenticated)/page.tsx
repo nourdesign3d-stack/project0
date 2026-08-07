@@ -1,5 +1,4 @@
 import { auth } from "@repo/auth/server";
-import { database } from "@repo/database";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { notFound } from "next/navigation";
@@ -32,9 +31,20 @@ const App = async () => {
     notFound();
   }
 
-  // TODO(domaine) : quand `Page` deviendra une entité métier, ce `findMany`
-  // devra porter le filtre de tenant (`where: { orgId }`) — invariant INV-001.
-  const pages = await database.page.findMany();
+  /**
+   * ⚠️ Cette page interrogeait `Page`, le modèle de **démonstration** du gabarit,
+   * retiré le 2026-08-07 (D-070). Une graine qui livre une table de démonstration
+   * la fait supprimer par chaque projet dérivé — et en attendant, sa page
+   * d'accueil affiche des données qui n'existent pas.
+   *
+   * Ce qui reste est délibérément vide : c'est l'emplacement du produit, et la
+   * graine n'a pas à décider ce qui s'y trouve.
+   *
+   * ⚠️ **Quand une entité scopée arrivera ici**, sa requête devra porter le
+   * filtre de tenant **dans le `where`** — invariant INV-001,
+   * `.claude/rules/security.md`. La règle Semgrep `local-tenant-filter-required`
+   * le fait respecter ; elle n'a rien à signaler tant qu'aucune requête n'existe.
+   */
 
   return (
     <>
@@ -47,13 +57,6 @@ const App = async () => {
         )}
       </Header>
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          {pages.map((page) => (
-            <div className="aspect-video rounded-xl bg-muted/50" key={page.id}>
-              {page.name}
-            </div>
-          ))}
-        </div>
         <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
       </div>
     </>
