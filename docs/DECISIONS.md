@@ -111,6 +111,65 @@ seul outil de graphe.
 
 ---
 
+## D-057 — Les affirmations vérifiables du dépôt sont devenues exécutoires
+
+**Date** : 2026-08-07
+**Contexte** : deux audits successifs ont désigné la même cause racine — *un texte annonce
+une protection, et personne ne vérifie que le code la sert*. Au 2026-08-07, **onze
+affirmations documentaires étaient fausses**, dont trois portaient sur des contrôles de
+sécurité (T-2002).
+
+Les corriger ne suffit pas : elles redeviendront fausses. Un document de sécurité périmé
+est **pire qu'absent**, parce qu'on s'y fie.
+
+**Trois affirmations sont désormais vérifiées mécaniquement**
+(`apps/api/__tests__/documentation-claims.test.ts`) :
+
+1. **les fichiers de spec cités par la CI existent** — le workflow renvoyait à
+   `access-control.spec.ts` comme portant le parcours à identifiants, alors que D-037
+   l'avait déplacé ; une référence périmée dans un commentaire de sécurité envoie le
+   prochain lecteur au mauvais endroit ;
+2. **les trois apps appliquent bien les en-têtes** — l'affirmation était fausse pour deux
+   d'entre elles jusqu'à D-034, et rien ne l'aurait signalé, la suite e2e ne démarrant
+   qu'une application (R-026) ;
+3. **chaque modèle Prisma figure au dictionnaire de données** — ce test a **immédiatement
+   trouvé une dérive réelle** : `WebhookEvent`, introduit en D-023 puis étendu en D-049,
+   n'y avait jamais été inscrit. Un modèle absent du dictionnaire est un modèle dont
+   personne n'a décidé s'il portait une donnée sensible.
+
+Les huit autres relèvent du jugement et restent à la charge de la revue. **Le dire vaut
+mieux que prétendre tout couvrir** — c'est précisément l'erreur que ce dépôt répète.
+
+**Ce que `SECURITY_MODEL.md` affirmait à tort** : l'idempotence « à implémenter » (en
+place depuis D-023), le filtrage Sentry « à faire » (fait, et ses deux angles morts sont
+maintenant nommés), un « contenu CMS » qui n'existe plus (D-031), Clerk « non configuré »
+sans dire qu'il avait été éprouvé (D-018), la sauvegarde « ni définie ni testée » alors
+que le mécanisme a été répété (D-027), et l'absence de toute mention du dépôt public et de
+la protection de `main`.
+
+---
+
+## D-058 — Deux tests qui ne pouvaient pas échouer
+
+**Date** : 2026-08-07
+
+**`/health`** vérifiait `status === 200` et `body === "OK"` — exactement les deux
+constantes que la route écrit. Un test qui relit ce que le code vient d'écrire ne teste
+rien : c'est la même idée exprimée deux fois.
+
+Ce qui mérite d'être gardé n'est pas la valeur renvoyée mais **la nature de la sonde** :
+vivacité, donc sans dépendance externe, synchrone, non mise en cache. Les trois cas
+échouent sur une sonde « améliorée » en asynchrone et dépendante — vu échouer.
+
+**Les prérequis de `pnpm verify` sont écrits** (`QUALITY_GATES.md`), avec ce qu'il ne
+couvre pas : il **n'exécute pas Playwright**. C'est sa limite la plus coûteuse, et elle a
+été payée le 2026-08-07 — un `test.use({ video })` dans un `describe` a passé la chaîne
+locale et fait échouer la CI. La conditionnalité de la couverture du parcours authentifié
+(`ENABLE_E2E`) y est également explicite : sans les secrets, les scénarios sont
+**ignorés**, pas réussis.
+
+---
+
 ## D-056 — Le dépôt ne pouvait plus appliquer aucun correctif de sécurité
 
 **Date** : 2026-08-07

@@ -13,6 +13,27 @@ pnpm test
 
 Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur**, sur tous les workspaces.
 
+### Prérequis, et ce que `pnpm verify` ne couvre pas
+
+`pnpm verify` enchaîne lint, typecheck, tests, tests des hooks/scripts/lanceur, frontières
+et build complet. Deux choses doivent être vraies avant qu'il ait un sens :
+
+- **le client Prisma est généré** (`pnpm --filter @repo/database run build`). Sur un clone
+  neuf, `pnpm install` ne le fait pas et le typecheck échoue sur
+  `Cannot find module './generated/client'` — voir D-042 ;
+- **les `.env.local` existent** (`pnpm env:setup`). Copier les `.env.example` ne suffit
+  pas : une variable optionnelle laissée à `""` échoue la validation Zod.
+
+⚠️ **`pnpm verify` n'exécute pas Playwright.** C'est sa limite la plus coûteuse : une
+erreur de configuration e2e passe la chaîne locale et n'apparaît qu'en CI — constaté le
+2026-08-07, où `test.use({ video })` dans un `describe` a fait échouer la CI après un
+`pnpm verify` vert (D-037). Avant de livrer un changement touchant `e2e/`, lancer
+`pnpm e2e` ou accepter que la CI soit le premier à le voir.
+
+⚠️ **La couverture du parcours authentifié est conditionnelle.** Sans `ENABLE_E2E` et les
+trois secrets de test, les scénarios authentifiés sont **ignorés**, pas réussis : la
+chaîne est verte sans les avoir joués. Ils tournent à chaque exécution sur `main`.
+
 ## Matrice
 
 | Type de changement | Contrôles obligatoires |
