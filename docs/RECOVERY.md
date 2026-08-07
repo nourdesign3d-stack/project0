@@ -127,6 +127,90 @@ un disque chiffré au début.
 **Une sauvegarde jamais restaurée n'est pas une sauvegarde.** D'où la répétition
 trimestrielle, restauration **ailleurs** que sur la source.
 
+### Automatisation
+
+```bash
+pnpm db:backup:scheduled
+```
+
+Produit un dump dans `$BACKUP_DIR` (défaut `~/Sauvegardes/<dépôt>`), applique la rétention,
+laisse une trace de succès, et **échoue bruyamment**. Ce qui le distingue du `db:backup`
+manuel :
+
+| | `db:backup` | `db:backup:scheduled` |
+| --- | --- | --- |
+| Rétention | aucune | 30 jours + 12 mensuelles |
+| Trace de succès | aucune | `.derniere-reussite` |
+| Échec | message | journal, notification système, **code de sortie 1** |
+| Dump vide | écrit le fichier | **refuse** — `pg_dump` peut sortir en 0 sans rien produire |
+
+**Vérifié le 2026-08-07** par exécution réelle : succès (5600 octets, permissions `600`,
+journal, preuve de vie) et échec simulé (code 1, échec journalisé, **preuve de vie
+inchangée** — un échec ne peut pas se déguiser en succès).
+
+#### Le chiffrement
+
+Sur macOS avec **FileVault actif** — vérifié sur le poste en service — un fichier écrit sur
+le disque est chiffré au repos par le système. Aucun outil supplémentaire n'est nécessaire.
+
+⚠️ **Une sauvegarde sur le poste de travail protège de la perte du compte Neon, pas de la
+perte du poste.** C'est un progrès réel — c'est le scénario le plus probable — mais ce
+n'est pas une copie hors site. Ajouter une seconde destination (disque externe, stockage
+distant) quand des données réelles existeront.
+
+#### Planification (macOS)
+
+Écrire `~/Library/LaunchAgents/local.project0.sauvegarde.plist` :
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>local.project0.sauvegarde</string>
+  <key>WorkingDirectory</key> <string>/CHEMIN/VERS/LE/DEPOT</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>pnpm db:backup:scheduled</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>RunAtLoad</key>        <false/>
+  <key>StandardErrorPath</key><string>/tmp/project0-sauvegarde.err</string>
+</dict>
+</plist>
+```
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.project0.sauvegarde.plist
+```
+
+Passer à quatre entrées `StartCalendarInterval` (3 h, 9 h, 15 h, 21 h) le jour où la
+fréquence passe à une sauvegarde toutes les 6 heures.
+
+⚠️ `launchd` exécute la tâche **au réveil** si l'heure prévue est passée pendant la veille.
+Un portable fermé la nuit n'exécutera donc pas la sauvegarde à 3 h, mais à l'ouverture —
+c'est acceptable, à condition de le savoir.
+
+#### Le silence n'est pas un succès
+
+Une notification ne se déclenche **que si le script s'exécute**. Elle attrape les échecs,
+jamais les **absences** d'exécution — machine éteinte plusieurs jours, agent déchargé,
+`pnpm` introuvable dans l'environnement de `launchd`. Or c'est le cas le plus dangereux :
+rien ne se passe, et rien ne le dit.
+
+Le seul dispositif qui attrape une absence est **extérieur à la machine** : un moniteur de
+pulsation. En créer un chez BetterStack — déjà câblé dans le dépôt pour la supervision de
+disponibilité — puis renseigner `BACKUP_HEARTBEAT_URL` : le script l'appelle après chaque
+succès, et le moniteur alerte quand l'appel manque.
+
+Tant que `BACKUP_HEARTBEAT_URL` n'est pas renseignée, **une interruption prolongée reste
+invisible**. C'est la limite la plus importante de ce dispositif, et il faut la connaître.
+
 ### Mise en place
 
 1. **Vérifier la fenêtre PITR du plan** de l'hébergeur de base. Si elle est inférieure au
@@ -149,9 +233,10 @@ trimestrielle, restauration **ailleurs** que sur la source.
 | Mécanisme (`db:backup` / `db:restore`) | **fait et éprouvé** (D-027) |
 | Politique (chiffres ci-dessus) | **décidée le 2026-08-07** |
 | Vérification de la fenêtre PITR | **faite le 2026-08-07 : 6 h** (plan gratuit) |
-| Emplacement hors hébergeur | **à choisir** |
-| Automatisation de la sauvegarde | **à faire** — quotidienne, puis toutes les 6 h au 1er client |
-| Alerte d'échec | **à faire** |
+| Emplacement hors hébergeur | **choisi** : poste de travail, FileVault actif. ⚠️ pas de copie hors site |
+| Automatisation de la sauvegarde | **écrite et éprouvée** (`db:backup:scheduled`) — **planification à installer** |
+| Alerte d'échec (exécution) | **faite** — journal, notification, code de sortie 1 |
+| Alerte d'**absence** d'exécution | **à faire** — moniteur de pulsation, `BACKUP_HEARTBEAT_URL` |
 | Première répétition trimestrielle | **à planifier** |
 
 Tant que les cinq dernières lignes ne sont pas faites, **la politique existe mais n'est
