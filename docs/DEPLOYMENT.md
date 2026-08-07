@@ -52,24 +52,34 @@ livre.
 
 ## Protection de `main`
 
-⚠️ **Aucune protection côté serveur.** Le dépôt est privé sur un plan GitHub gratuit :
-l'API refuse aussi bien les branches protégées que les rulesets
-(`403 — Upgrade to GitHub Pro or make this repository public`).
+**Protection côté serveur active depuis le 2026-08-07.** Elle était impossible tant que
+le dépôt était privé sur un plan gratuit — l'API répondait
+`403 — Upgrade to GitHub Pro or make this repository public`. Le passage en public a levé
+la contrainte, et la règle a été appliquée le jour même.
 
-Ce qui est en place à la place :
+Ce qui est exigé sur `main` :
 
-- un hook `pre-push` versionné dans `.githooks/` qui refuse un push direct sur `main` ;
-- activation obligatoire après clonage : `pnpm hooks:install` ;
-- exception assumée et tracée : `ALLOW_DIRECT_PUSH_MAIN=1 git push origin main`.
+| Contrôle | État |
+| --- | --- |
+| `Lint · Typecheck · Test · Build` vert | **requis** |
+| `Semgrep` vert | **requis** |
+| Poussée forcée | **interdite** |
+| Suppression de la branche | **interdite** |
+| Conversations résolues avant fusion | **requis** |
 
-**Ce hook n'est pas un contrôle de sécurité** : il est local, contournable, et ne
-s'applique qu'aux postes qui l'ont activé. Rien n'empêche techniquement une fusion sans
-CI verte. La discipline repose donc sur la revue et sur `QUALITY_GATES.md`.
+Deux choix délibérés, à revoir quand l'équipe grandit :
 
-Pour obtenir une vraie protection : passer le dépôt en public, ou souscrire GitHub Pro.
-La règle à appliquer alors — PR obligatoire, checks requis `Lint · Typecheck · Test · Build`
-et `Semgrep`, historique linéaire, force-push et suppression interdits — est prête et
-n'attend que le déblocage du plan. Suivi : risque R-011 dans `RISKS.md`.
+- **La revue n'est pas exigée.** À un seul mainteneur, GitHub interdit d'approuver sa
+  propre PR : l'exiger bloquerait toute fusion. À activer dès qu'un second relecteur
+  existe.
+- **Les administrateurs ne sont pas soumis à la règle** (`enforce_admins: false`), ce qui
+  laisse une sortie de secours en incident. C'est une confiance accordée au propriétaire,
+  pas un contrôle.
+
+Le hook local `pre-push` (`.githooks/`, `pnpm hooks:install`) reste utile : il refuse le
+push direct **avant** l'aller-retour réseau, et l'exception `ALLOW_DIRECT_PUSH_MAIN=1`
+sert la création initiale d'un dépôt. Mais il n'est plus le seul rempart — c'est ce qui
+change. Suivi : risque R-011 dans `RISKS.md`.
 
 ## Alertes de vulnérabilité
 

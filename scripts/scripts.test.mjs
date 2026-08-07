@@ -634,6 +634,54 @@ cases.push({
   },
 });
 
+check(
+  "db:backup : une URL locale est traduite vers le point de vue du conteneur",
+  async () => {
+    // Les outils tournent DANS le conteneur, où Postgres écoute sur 5432, mais
+    // DATABASE_URL décrit la base telle que l'HÔTE la voit. Tant que
+    // POSTGRES_PORT valait 5432 les deux coïncidaient ; dès qu'il change, la
+    // sauvegarde échouait sur un refus de connexion (D-047).
+    const { forContainer } = await import("./lib/database-url.mjs");
+
+    assert(
+      forContainer("postgresql://postgres:motdepasse@localhost:5433/app") ===
+        "postgresql://postgres:motdepasse@localhost:5432/app",
+      "un port publié non standard n'est pas ramené à 5432"
+    );
+
+    assert(
+      forContainer("postgresql://u:p@127.0.0.1:15432/app").includes(":5432/"),
+      "127.0.0.1 n'est pas traité comme un hôte local"
+    );
+  }
+);
+
+check("db:backup : une URL distante n'est jamais réécrite", async () => {
+  // Une base Neon est déjà exprimée du point de vue du réseau : la traduire
+  // ferait pointer la sauvegarde sur le conteneur local.
+  const { forContainer } = await import("./lib/database-url.mjs");
+  const remote = "postgresql://u:p@ep-x.eu-central-1.aws.neon.tech:5432/app";
+
+  assert(forContainer(remote) === remote, "une URL distante a été réécrite");
+
+  const other = "postgresql://u:p@db.exemple.test:6543/app";
+
+  assert(
+    forContainer(other) === other,
+    "un port distant non standard a été écrasé"
+  );
+});
+
+check("db:backup : une URL illisible est laissée telle quelle", async () => {
+  // La transformer en silence produirait une erreur qui ne la concerne pas.
+  const { forContainer } = await import("./lib/database-url.mjs");
+
+  assert(
+    forContainer("pas une URL") === "pas une URL",
+    "URL illisible altérée"
+  );
+});
+
 // --- Exécution --------------------------------------------------------------
 
 let failures = 0;

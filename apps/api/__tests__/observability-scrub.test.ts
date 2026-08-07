@@ -134,4 +134,48 @@ describe("filtrage des événements Sentry", () => {
     // Une erreur levée hors contexte HTTP — tâche planifiée, démarrage.
     expect(() => scrubRequest({ transaction: "cron" })).not.toThrow();
   });
+
+  test("coupe un secret placé dans le fragment", () => {
+    // Forme des redirections OAuth implicites : le jeton voyage après le `#`,
+    // jamais envoyé au serveur mais bien présent dans un message d'erreur.
+    // Cinq formes sur six passaient avant le 2026-08-07 (D-045).
+    const event = scrubRequest({
+      message: "échec sur https://app.test/callback#access_token=SECRET_OAUTH",
+    });
+
+    expect(JSON.stringify(event)).not.toContain("SECRET_OAUTH");
+    expect(JSON.stringify(event)).toContain("/callback");
+  });
+
+  test("retire la partie userinfo d'une adresse", () => {
+    const event = scrubRequest({
+      message:
+        "connexion refusée : postgresql://postgres:MOTDEPASSE@db.test:5432/app",
+    });
+
+    expect(JSON.stringify(event)).not.toContain("MOTDEPASSE");
+    expect(JSON.stringify(event)).toContain("db.test");
+  });
+
+  test("coupe au premier séparateur quand les deux sont présents", () => {
+    const event = scrubRequest({
+      message: "https://app.test/x?cle=UN#jeton=DEUX",
+    });
+
+    const serialized = JSON.stringify(event);
+
+    expect(serialized).not.toContain("UN");
+    expect(serialized).not.toContain("DEUX");
+  });
+
+  test("ne touche pas un mot ordinaire portant un dièse", () => {
+    // Un numéro de ticket ou une couleur ne sont pas des adresses : les tronquer
+    // ferait perdre du contexte sans rien protéger.
+    const event = scrubRequest({
+      message: "régression #4212 sur la teinte #ff8800",
+    });
+
+    expect(JSON.stringify(event)).toContain("#4212");
+    expect(JSON.stringify(event)).toContain("#ff8800");
+  });
 });
