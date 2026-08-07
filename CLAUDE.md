@@ -9,6 +9,8 @@ sont dans `.claude/rules/`, la connaissance du projet dans `docs/`.
 1. **Inspecter avant de modifier** — lire le code réellement concerné, pas seulement le fichier cible.
 2. **Lire les documents pertinents** — `docs/ARCHITECTURE.md`, `docs/DOMAIN_MODEL.md`,
    `docs/SECURITY_MODEL.md`, `docs/QUALITY_GATES.md` selon la nature du changement.
+   Pour tout ce qui touche aux variables d'environnement ou aux services tiers :
+   `docs/SETUP.md`, dont la couverture est vérifiée par un test.
 3. **Comprendre le besoin** — critères d'acceptation explicites. Toute hypothèse est
    annoncée comme hypothèse et consignée dans `docs/ASSUMPTIONS.md`.
 4. **Identifier les impacts** — apps/packages touchés, contrats, données, permissions, cache, déploiement.

@@ -29,6 +29,11 @@ désignent pas leur cause :
   un clone neuf échoue avec `Cannot find module './generated/client'` — vérifié le
   2026-08-07 sur une installation vierge.
 
+> **Vous démarrez un nouveau projet ?** [`docs/SETUP.md`](./docs/SETUP.md) répond à
+> « quelle clé, chez qui, une par projet ou partagée, et qu'est-ce qui doit changer avant
+> un déploiement ». Son contenu est vérifié : une variable non documentée fait échouer la
+> chaîne.
+
 Variables réellement requises : `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`,
 `NEXT_PUBLIC_WEB_URL`. Les clés de services tiers sont commentées par `env:setup` :
 les décommenter au fur et à mesure. Détail dans

@@ -149,6 +149,38 @@ la protection de `main`.
 
 ---
 
+## D-063 — Un guide d'initialisation, dont la couverture est vérifiée
+
+**Date** : 2026-08-07
+**Contexte** : la connaissance nécessaire pour démarrer un projet depuis la graine était
+**dispersée** — six lignes dans le README, des tableaux de variables dans
+`DEPLOYMENT.md`, des contraintes dans `DECISIONS.md`. Aucun document ne répondait aux
+trois questions que se pose réellement celui qui arrive : *que faut-il pour que ça
+démarre, quelle clé chez qui, et qu'est-ce qui doit changer avant un déploiement ?*
+
+`docs/SETUP.md` y répond, et pose la règle qui manquait : **un compte par produit, pas
+seulement une clé par produit.** La raison n'est pas l'hygiène mais le rayon d'explosion —
+une clé qui fuite ne doit compromettre qu'un produit, et une clé partagée entre deux
+produits ne peut jamais être révoquée sans en casser un.
+
+**Rendu vérifiable.** `apps/api/__tests__/setup-guide.test.ts` compare l'inventaire réel
+des `.env.example` au contenu du guide : les **36 variables** du dépôt y sont, et en
+retirer une du guide fait rougir la chaîne — vu échouer.
+
+Ce contrôle n'est pas théorique. C'est exactement ce qui manquait à BetterStack : les
+variables que la bibliothèque lit réellement n'existaient nulle part dans le dépôt, la
+journalisation se rabattait en silence sur la console, et personne ne l'a vu pendant des
+semaines (D-028). Un guide qui oublie une variable est **pire qu'absent** — on croit avoir
+tout renseigné.
+
+**Ce que le guide dit et que personne n'écrit d'habitude** : que trois variables suffisent
+à démarrer et qu'aucun compte tiers n'est nécessaire ; que PostHog n'est pas urgent, parce
+que de l'analytique que personne ne lit est une collecte sans finalité ; et que
+`pnpm verify` n'exécute pas Playwright, donc qu'un déploiement exige de lancer `pnpm e2e`
+séparément.
+
+---
+
 ## D-062 — La sauvegarde est automatisée, et son angle mort est nommé
 
 **Date** : 2026-08-07
