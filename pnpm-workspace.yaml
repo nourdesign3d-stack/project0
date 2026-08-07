@@ -15,6 +15,14 @@ overrides:
   # que toutes les applications déclarent 16.2.12. Relevé par audit externe.
   next: 16.2.12
 
+  # `next` embarque sa propre copie de `sharp` en 0.34.x, sous le seuil de
+  # correction 0.35.0 : monter la dépendance directe de `apps/web` ne suffisait
+  # pas, l'arbre gardait une version vulnérable atteignable par l'optimisation
+  # d'images. Quatre CVE héritées de libvips (CVE-2026-33327, -33328, -35590,
+  # -35591), gravité haute — **la seule alerte du dépôt réellement atteignable
+  # en production**, sur les 58 que compte l'arbre. Voir D-056.
+  sharp: ^0.35.3
+
 # --- Durcissement de la chaîne d'approvisionnement (pnpm >= 10.26) ---
 # Motivé par les règles Semgrep p/owasp-top-ten sur les gestionnaires de paquets.
 
@@ -46,6 +54,29 @@ trustPolicyExclude:
   # a retrouvé une attestation de provenance ; si oui, retirer cette ligne. Le
   # contrôle est rappelé par la commande /vibe.
   - chokidar
+
+  # 2026-08-07 — `semver@6.3.1` bloquait **toute** montée de version du dépôt.
+  #
+  # Découvert en voulant appliquer un correctif de sécurité (sharp, 4 CVE
+  # libvips) : `pnpm install --frozen-lockfile` passe, mais `pnpm add` et
+  # `pnpm up` échouent — sur un paquet **déjà présent dans le lockfile**, atteint
+  # par `@vitejs/plugin-react > @babel/core > @babel/helper-compilation-targets`.
+  #
+  # Cette exception n'admet donc **aucun paquet nouveau** : elle reconnaît un
+  # paquet déjà installé, dont rien sur le disque ne change. Ce qu'elle débloque,
+  # c'est la capacité à corriger.
+  #
+  # Le signal est une perte d'attestation de provenance, pas une preuve de
+  # compromission — `semver` 6.3.1 est publié par l'équipe npm elle-même et
+  # antérieur à la généralisation des attestations. Un contrôle qui gèle
+  # l'application des correctifs de sécurité protège moins qu'il ne coûte : le
+  # dépôt était devenu incapable de traiter la seule alerte atteignable en
+  # production. Voir R-015 et D-056.
+  #
+  # ÉCHÉANCE : à réexaminer avant le 2026-11-07 (trois mois). Vérifier si la
+  # chaîne Babel a cessé de dépendre de `semver` 6.x — auquel cas retirer cette
+  # ligne. Rappelé par la commande /vibe.
+  - semver
 
 # Interdit l'installation de dépendances transitives depuis des sources exotiques
 # (git, tarball distant) plutôt que depuis le registre.

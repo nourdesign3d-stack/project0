@@ -111,6 +111,95 @@ seul outil de graphe.
 
 ---
 
+## D-056 — Le dépôt ne pouvait plus appliquer aucun correctif de sécurité
+
+**Date** : 2026-08-07
+**Contexte** : `sharp` était la **seule** des 58 alertes de l'arbre de production
+réellement atteignable — quatre CVE héritées de libvips, gravité haute, sur le chemin
+de l'optimisation d'images. La version corrigée existait.
+
+**Elle était inapplicable.** `pnpm add sharp@0.35.3` échouait sur
+`ERR_PNPM_TRUST_DOWNGRADE` pour `semver@6.3.1`, atteint par
+`@vitejs/plugin-react > @babel/core > @babel/helper-compilation-targets` — **un paquet
+déjà présent dans le lockfile**. `pnpm install --frozen-lockfile` passait, la CI était
+verte, et personne n'avait essayé de monter quoi que ce soit depuis la mise en place de
+`trustPolicy` : le dépôt était **gelé** sans que rien ne le signale.
+
+C'est le coût de R-015 devenu concret, et il est plus lourd qu'annoncé : un contrôle qui
+empêche d'installer un paquet douteux est utile ; un contrôle qui empêche de **corriger**
+ne protège plus rien.
+
+**Exception nommée, datée, avec échéance** — même forme que `chokidar` (D-013). Elle
+n'admet aucun paquet nouveau : elle reconnaît un paquet déjà installé, dont rien sur le
+disque ne change. Ce qu'elle débloque, c'est la capacité à corriger.
+
+**Deux gestes, pas un.** Monter la dépendance directe de `apps/web` ne suffisait pas :
+`next` embarque sa propre copie de `sharp` en 0.34.x. Il a fallu un `override` sur tout
+l'arbre. Mesure avant/après : **1 alerte `sharp` → 0**, total production 58 → 57.
+
+Le triage complet des 58 alertes est dans `docs/RISKS.md` (R-014) : ~32 viennent de
+`@prisma/dev` — outillage local —, ~12 de `@repo/ai` qu'aucune application n'importe, le
+reste est du temps de build. **Une seule était atteignable, et c'est celle-là.**
+
+---
+
+## D-055 — Deux affirmations que le passage en public a rendues fausses
+
+**Date** : 2026-08-07
+
+**`/health` répondait `200` sans rien vérifier**, et rien ne le disait. Un contrôle qui
+ne peut pas échouer donne une assurance qu'il ne fournit pas : une supervision branchée
+dessus resterait au vert pendant que la base est injoignable. La route dit désormais ce
+qu'elle affirme — le processus sert du HTTP — et ce qu'elle n'affirme pas.
+
+Elle **n'interroge toujours pas la base**, et c'est délibéré : une sonde de vivacité qui
+échoue fait *redémarrer* le processus. La faire dépendre de la base transformerait une
+panne de base en boucle de redémarrages, aggravant l'incident au lieu de le signaler. La
+sonde de disponibilité est un autre objet, à écrire quand un orchestrateur en consommera
+une. `cache-control: no-store` a été ajouté : une réponse de sonde mise en cache ne
+prouve plus rien du moment présent.
+
+**Les artefacts de CI ne sont plus téléchargeables par les seuls collaborateurs.** Depuis
+le passage en public, n'importe qui le peut, sans authentification. Le commentaire du
+workflow décrivait l'ancien modèle de menace et renvoyait de surcroît à
+`access-control.spec.ts`, alors que D-037 avait déplacé le parcours à identifiants dans
+`authenticated-journey.spec.ts`. Les deux sont corrigés, et la question à se poser avant
+d'ajouter un artefact est désormais écrite : **qui pourra le télécharger**, et non qui
+devrait.
+
+**`apps/api/instrumentation-client.ts` est supprimé** : il initialisait Sentry côté
+navigateur et l'analytique pour une application qui ne sert que des webhooks, un cron et
+`/health`.
+
+---
+
+## D-054 — Le formulaire de contact renvoyait ses erreurs internes et se laissait contourner
+
+**Date** : 2026-08-07
+**Contexte** : seule frontière publique non authentifiée de `apps/web`, et **aucun test
+ne la gardait** — l'application n'en avait aucun.
+
+**La clé de limitation de débit venait de `x-forwarded-for` tel quel.** Trois défauts en
+une ligne : l'en-tête est fourni par le client, donc une valeur différente à chaque
+requête annulait la limite ; c'est une liste séparée par des virgules, dont la chaîne
+entière servait de clé ; et absent, il donnait `contact_form_null` — un seau **partagé
+par tous**, où le premier visiteur consommait le quota de tout le monde.
+
+Seul le premier élément est retenu. Sans en-tête, on **refuse** plutôt que de partager un
+seau. La limite reste ce qu'elle est : un garde-fou contre l'usage abusif ordinaire,
+digne de confiance derrière un proxy qui réécrit l'en-tête, falsifiable sans lui — R-003.
+
+**Toute erreur serveur repartait au navigateur.** « Email is not configured. »
+renseignait un visiteur anonyme sur l'état de configuration, et une erreur du
+fournisseur d'e-mail partait telle quelle. Trois messages neutres remplacent le tout ; le
+détail reste côté serveur, où il est utile. Un refus de validation ne devient plus un
+incident Sentry (D-052).
+
+**`apps/web` a désormais une suite de tests** — la première. Six cas, dont **cinq vus
+échouer** sur le code d'avant.
+
+---
+
 ## D-053 — La contrainte du pooler Neon est écrite là où on la lit
 
 **Date** : 2026-08-07
