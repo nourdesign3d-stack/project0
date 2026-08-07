@@ -10,46 +10,79 @@
  * D'où un filtre unique, appliqué aux deux canaux et aux trois runtimes : un
  * garde-fou qui ne couvre qu'une sortie sur trois donne une fausse assurance,
  * ce qui est pire que pas de garde-fou du tout. Voir D-026, R-010, R-018.
- *
- * `query_string` est inclus : une URL transporte régulièrement un jeton de
- * réinitialisation ou un identifiant de session.
  */
 
 interface RequestBearing {
   request?: Record<string, unknown>;
 }
 
-/** Profondeur suffisante pour un événement Sentry, et borne contre un cycle. */
-const MAX_DEPTH = 12;
+/**
+ * Profondeur maximale explorée. Les cycles sont traités par `seen` ; cette borne
+ * ne protège que d'un objet pathologiquement profond.
+ */
+const MAX_DEPTH = 64;
 
-const URL_WITH_QUERY = /^(?:https?:\/\/|\/)[^\s]*\?/;
+const WHITESPACE_GROUPS = /(\s+)/;
+const HAS_SCHEME = /^https?:\/\//i;
 
 /**
- * Une chaîne de requête ne sort pas, **où qu'elle se trouve**.
+ * Un mot ressemble-t-il à une URL porteuse de paramètres ?
  *
- * La première version ne vidait que `request.query_string`. La mesure a montré
- * que le jeton d'URL survivait à trois autres endroits : `request.url`,
- * `contexts.trace.data["http.target"]` et `contexts.nextjs.request_path`. Une
- * liste de champs aurait été à refaire à chaque version du SDK ; une politique
- * appliquée à toute valeur ressemblant à une URL tient dans la durée.
+ * ⚠️ La version précédente testait la chaîne **entière** avec une expression
+ * ancrée (`/^(?:https?:\/\/|\/)[^\s]*\?/`). Elle ne voyait donc une URL que si
+ * celle-ci commençait la chaîne. Un audit externe a montré le trou le
+ * 2026-08-06 : `"fetch failed: https://api/reset?token=SECRET"` sortait
+ * **intact**, et c'est le cas le plus courant — un message d'erreur de `fetch`
+ * embarque l'URL appelée. Idem pour `exception.values[].value`, le champ où un
+ * jeton a le plus de chances d'atterrir. Voir D-035.
  *
- * Le chemin est conservé — sans lui, un événement ne sert plus à rien.
+ * On raisonne désormais **mot par mot** : un mot est suspect s'il contient un
+ * `?` et ressemble à une adresse — schéma explicite, ou simple présence d'un
+ * `/`, ce qui couvre `api.exemple.com/v1/x?cle=…` sans schéma.
  */
-const stripQueryStrings = (node: unknown, depth = 0): void => {
+const isUrlLike = (word: string): boolean =>
+  word.includes("?") && (HAS_SCHEME.test(word) || word.includes("/"));
+
+/**
+ * Coupe la chaîne de requête de chaque mot qui en porte une, en conservant tout
+ * le reste du texte — ponctuation et espacement compris.
+ *
+ * Le chemin est gardé : sans lui, un événement ne sert plus à rien, et un filtre
+ * qui rend le diagnostic impossible finit contourné.
+ *
+ * Effet de bord assumé : un mot très long contenant à la fois `/` et `?` — du
+ * JSON sérialisé sans espaces, par exemple — sera tronqué à son premier `?`.
+ * On perd du contexte plutôt que de laisser fuir un jeton.
+ */
+const withoutQuery = (value: string): string =>
+  value
+    .split(WHITESPACE_GROUPS)
+    .map((word) => (isUrlLike(word) ? word.slice(0, word.indexOf("?")) : word))
+    .join("");
+
+const stripQueryStrings = (
+  node: unknown,
+  seen: WeakSet<object>,
+  depth = 0
+): void => {
   if (depth > MAX_DEPTH || !(node && typeof node === "object")) {
     return;
   }
 
+  // Un événement Sentry peut contenir des références circulaires : sans cette
+  // mémoire, la profondeur maximale servait de seule protection, et tout ce qui
+  // se trouvait au-delà ressortait intact.
+  if (seen.has(node)) {
+    return;
+  }
+
+  seen.add(node);
+
   for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
     if (typeof value === "string") {
-      if (URL_WITH_QUERY.test(value)) {
-        (node as Record<string, unknown>)[key] = value.slice(
-          0,
-          value.indexOf("?")
-        );
-      }
+      (node as Record<string, unknown>)[key] = withoutQuery(value);
     } else {
-      stripQueryStrings(value, depth + 1);
+      stripQueryStrings(value, seen, depth + 1);
     }
   }
 };
@@ -68,7 +101,7 @@ export const scrubRequest = <T>(event: T): T => {
     request.query_string = undefined;
   }
 
-  stripQueryStrings(event);
+  stripQueryStrings(event, new WeakSet());
 
   return event;
 };

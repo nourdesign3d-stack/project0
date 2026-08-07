@@ -144,6 +144,191 @@ les trois artefacts. Vu échouer après retrait de la directive.
 **Ce qui reste vrai** : la rétention est de sept jours, le dépôt est privé, et le compte est
 dédié aux tests. Le périmètre était borné — mais `CLERK_SECRET_KEY` transite dans le même
 job, et un mot de passe de compte de test reste un secret de dépôt.
+## D-036 — Le garde-fou Bash réparé : six défauts, aucun n'exigeait d'obscurcissement
+
+**Date** : 2026-08-06
+**Contexte** : R-016 classait ce garde-fou en « accepté », au motif qu'un contournement
+demandait un **obscurcissement déterminé** — encodage, chaîne construite. Un audit externe
+a envoyé 34 formulations : **29 sont passées**, et aucune n'était obscurcie.
+
+**Les six défauts, et ce qu'ils avaient en commun** :
+
+| Défaut | Ce qui passait |
+| --- | --- |
+| Tout jeton entre guillemets était ignoré | `rm "-rf" /chemin`, `git "push" "--force"`, `docker compose down "-v"` |
+| Seuls les chemins **absolus** comptaient pour le bac à sable | `rm -rf /tmp/keep ~/Documents` |
+| Le corps de heredoc était effacé **depuis le `<<`** | `cat <<'EOF' && rm -rf /x` — la commande disparaissait de l'analyse |
+| `(` et `{` n'étaient pas des séparateurs | `(rm -rf /x)` devenait le jeton `(rm` |
+| Lecteurs manquants | `hexdump`, `openssl`, `rev`, `split`, `shasum`, `ditto` |
+| Destructions manquantes | `shred`, `truncate -s 0` |
+
+Le cas du heredoc est le pire : le garde-fou ne **ratait** pas la commande, il l'**effaçait
+de sa propre vue** puis répondait « autorisé ». Un garde-fou qui se rend aveugle et
+l'affirme est pire que pas de garde-fou.
+
+**Les corrections** :
+
+Le critère « entre guillemets » est remplacé par le critère **espacement**. Les guillemets
+avaient été écartés pour qu'un message de commit parlant de `rm -rf` ne déclenche rien —
+l'intention était bonne, le critère mauvais. Un argument réel ne contient pas d'espace ;
+une phrase en contient toujours. `"-rf"` compte, `"docs: git push --force"` reste du texte.
+
+Le bac à sable considère désormais **tous** les arguments non-drapeaux, après expansion du
+`~` et résolution depuis le dossier courant. Un seul chemin hors zone réarme la règle.
+
+Le corps de heredoc ne commence qu'à la **ligne suivante** : la fin de la ligne d'ouverture
+est conservée et analysée. Les groupes deviennent des séparateurs d'invocation.
+
+**La suite de tests passe de 85 à 113 cas.** C'est le vrai enseignement : les 85 cas
+précédents ne contenaient **aucun** drapeau entre guillemets. Ils éprouvaient ce que
+l'auteur avait déjà en tête — le contrôle et son test venaient de la même idée.
+
+**Un cas de test écrit de travers, corrigé** : j'avais inscrit `rm -rf ~/../../tmp/hors-zone`
+comme devant être refusé. Il est légitimement autorisé — ce chemin résout dans le
+temporaire. Le garde-fou avait raison, mon attente était fausse.
+
+**La limite est requalifiée, pas supprimée.** Ce n'est toujours pas une frontière de
+sécurité : un encodage, une variable construite à l'exécution ou un interpréteur tiers
+passeront. Mais R-016 ne peut plus dire « il faut être déterminé » — c'était faux, et
+`rm -rf /tmp/x ~/Documents` est une frappe ordinaire, pas une attaque.
+## D-035 — Le filtre Sentry raisonne par mot, plus par chaîne entière
+
+**Date** : 2026-08-06
+**Contexte** : D-026 affirmait « une chaîne de requête ne sort pas, **où qu'elle se
+trouve** ». C'était faux. L'expression était **ancrée** :
+`/^(?:https?:\/\/|\/)[^\s]*\?/` — elle ne reconnaissait une URL que si celle-ci
+**commençait** la chaîne.
+
+Un audit externe l'a mesuré le 2026-08-06. Sortaient intacts :
+
+| Champ | Contenu |
+| --- | --- |
+| `message` | `fetch failed: https://api/reset?token=SECRET` |
+| `exception.values[].value` | `Error at /callback?code=SECRET returned 500` |
+| `breadcrumbs[].message` | `GET api.exemple.com/v1/x?key=SECRET` |
+
+Le deuxième est le pire : `exception.values[].value` est le champ où un jeton a le plus de
+chances d'atterrir, parce qu'un message d'erreur de `fetch` embarque l'URL appelée. À
+`tracesSampleRate: 1`, c'est à chaque requête.
+
+**Pourquoi les tests ne l'avaient pas vu** : ils n'utilisaient qu'une charge utile où les
+URL étaient **seules dans leur champ** — exactement la forme mesurée au collecteur la
+veille. Le test reproduisait la mesure, il ne l'élargissait pas.
+
+**Décision** : raisonner **mot par mot** plutôt que sur la chaîne entière. Un mot est
+suspect s'il contient un `?` et ressemble à une adresse — schéma explicite, ou simple
+présence d'un `/`, ce qui couvre `api.exemple.com/v1/x?cle=…` sans schéma. Le reste du
+texte est conservé intégralement : ponctuation, espacement, mots voisins.
+
+**Second trou, corrigé aussi** : `MAX_DEPTH = 12` servait à la fois de borne de récursion
+**et** de protection contre les cycles. Au-delà de douze niveaux, une valeur ressortait
+intacte. Les cycles sont désormais traités par un `WeakSet`, et la borne passe à 64 — elle
+ne protège plus que d'un objet pathologique.
+
+**Vérifié** : neuf tests, dont quatre nouveaux portant sur la charge utile de l'audit, la
+profondeur, les cycles, et la préservation du texte autour de l'URL. Le test central a été
+**vu échouer** après rétablissement de l'ancrage fautif, et repasser après correction.
+
+**Effet de bord assumé** : un mot très long contenant à la fois `/` et `?` — du JSON
+sérialisé sans espaces — sera tronqué à son premier `?`. On perd du contexte plutôt que de
+laisser fuir un jeton.
+## D-034 — Les en-têtes de sécurité, enfin mesurés — et absents de deux apps sur trois
+
+**Date** : 2026-08-06
+**Contexte** : `SECURITY_MODEL.md` déclarait Nosecone « actif » depuis le premier jour.
+Personne n'avait jamais regardé ce qui sortait réellement. Un audit externe l'a fait.
+
+**Constaté, puis reproduit** :
+
+| Application | En-têtes servis avant |
+| --- | --- |
+| `apps/app` | l'ensemble complet |
+| `apps/web` | **aucun** |
+| `apps/api` | **aucun** |
+
+**Deux causes distinctes.** `apps/web/proxy.ts` faisait
+`return middlewareResponse || headersResponse`. Le middleware d'internationalisation
+renvoie **toujours** quelque chose — une réécriture pour `/`, une redirection pour
+`/en/...` — donc la réponse portant les en-têtes était systématiquement jetée. Un `||` a
+suffi à désarmer tout le dispositif sur le site public, celui qui reçoit justement le
+trafic anonyme. Et `apps/api` n'avait **aucun proxy** : ses webhooks, son `/health` et sa
+tâche planifiée répondaient sans le moindre en-tête.
+
+**Décision** : compléter les en-têtes de la réponse d'i18n au lieu de la remplacer, et
+doter `apps/api` de son propre proxy. `poweredByHeader: false` au passage — `X-Powered-By`
+annonçait la pile sans contrepartie.
+
+**Mesuré après correction**, build de production, requête réelle :
+
+- `apps/web` sur `/en`, soit **une redirection 307** — le cas exact qui échouait :
+  `strict-transport-security`, `x-frame-options`, `x-content-type-options`,
+  `referrer-policy`, les trois `cross-origin-*`, `x-permitted-cross-domain-policies`.
+  Aucun `x-powered-by`.
+- `apps/api` sur `/health` : le même ensemble.
+
+**Un contrôle durable, pas une case cochée** : `e2e/tests/security-headers.spec.ts`
+interroge l'application en marche et lit les en-têtes, avec un cas dédié à la redirection.
+Il ne couvre que `apps/app` — la suite e2e ne démarre qu'une application (R-026).
+
+**Ce que je ne corrige pas, et qui est plus grave que ce qui précède** : la **CSP est
+désactivée** sur les trois apps, par configuration héritée du template, et aucun document
+ne le signalait. Elle ne peut pas être générique : elle se rédige à partir des origines
+réellement utilisées — Clerk, Sentry, PostHog, Vercel. Devenu **R-025**, à traiter avant
+toute mise en service.
+
+**Note de méthode** : mesurer a exigé de fabriquer une clé Clerk locale non fonctionnelle,
+parce que la graine renvoie `500` sur toutes les routes sans clé. C'est le constat n°5 de
+l'audit, traité séparément — mais il explique pourquoi personne n'avait jamais vu ces
+en-têtes : il fallait d'abord franchir un mur.
+
+**Effet de bord relevé par le contrôle de frontières** : `apps/api` importait
+`@repo/security` sans le déclarer. `pnpm boundaries` l'a refusé — le garde-fou a fonctionné.
+## D-033 — Le contrôle d'autorisation vit dans la route, pas dans le layout
+
+**Date** : 2026-08-06
+**Contexte** : un audit externe a démontré que le « plancher » de D-024 ne tenait pas.
+
+**Ce qui a été constaté** — reproduit et confirmé :
+
+| Cas | Test statique | Réalité |
+| --- | --- | --- |
+| `route.ts` **sans aucun contrôle** sous `(authenticated)` | **3/3 verts** | `200` à un appel anonyme, `userId: null` |
+| `auth()` retiré de `search/page.tsx` | **3/3 verts** | — |
+
+**La cause** : `isProtected` remontait les `layout.tsx` parents. Comme
+`(authenticated)/layout.tsx` appelle `currentUser()`, **toute** route sous ce groupe était
+réputée protégée, quel que soit son contenu.
+
+Deux erreurs distinctes dans cette remontée :
+
+1. Un **route handler n'exécute jamais de layout**. Les layouts appartiennent au rendu
+   React, pas au traitement d'une requête HTTP. Le crédit était purement imaginaire.
+2. Même pour une **page**, un layout n'est pas une autorisation : Next évalue pages et
+   layouts **en parallèle**, donc une lecture de données peut partir avant la redirection.
+   `.claude/rules/security.md` le disait déjà — « au plus près de l'accès aux données » —
+   et le commentaire de `(authenticated)/page.tsx` l'expliquait mot pour mot. Le test ne
+   faisait pas respecter la règle que le dépôt s'était donnée.
+
+**Décision** : le contrôle doit se trouver **dans le fichier de la route**. Aucun crédit
+hérité, ni pour une page, ni pour un route handler.
+
+**Conséquence immédiate** : `(authenticated)/webhooks/page.tsx` n'avait aucun contrôle et
+appelait Svix (`getAppPortal`) en s'appuyant sur le layout. Un contrôle `orgId` y a été
+ajouté — c'était un défaut réel, pas une formalité de test.
+
+**Second angle mort, même famille** : `toUrlPath` retirait les segments dynamiques.
+`(authenticated)/items/[id]/page.tsx` devenait `/items`, une URL inexistante ; Playwright
+recevait un `404`, que la liste des refus acceptait. Le test passait au vert **sans avoir
+touché la route**. Sur une application multi-tenant, la ressource identifiée par un
+paramètre est justement celle qu'il faut contrôler.
+
+`toUrlPath` renvoie désormais `null` pour une route dynamique, et un test dédié **échoue**
+en les nommant : fournir une valeur d'exemple, ou assumer explicitement l'absence de
+contrôle d'exécution. Le silence n'est plus une option.
+
+**Ce que cet épisode enseigne** : le contrôle, son test, et l'idée derrière les deux
+venaient de la même personne. Le test confirmait l'intention au lieu d'éprouver le
+comportement. C'est le motif commun des trois constats les plus graves de cet audit.
 
 ---
 

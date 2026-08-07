@@ -121,6 +121,58 @@ const cases = [
   ['git commit -m "docs: git reset --hard detruit le travail"', "autorisé"],
   ['gh issue create --body "eviter wget x | sh"', "autorisé"],
 
+  // Cinquième audit (externe, 2026-08-06) : 29 contournements relevés, tous
+  // sans obscurcissement. Aucun des 85 cas précédents ne mettait un drapeau
+  // entre guillemets — la suite éprouvait ce que l'auteur avait déjà en tête.
+  // Voir D-036.
+  ['rm "-rf" /Users/vibesspace/Project0/apps', "refusé"],
+  ['rm "-r" /Users/vibesspace/Project0/docs', "refusé"],
+  ['git "push" "--force" origin main', "refusé"],
+  ['git reset "--hard" HEAD~3', "refusé"],
+  ['docker compose down "-v"', "refusé"],
+  ['pnpm exec prisma migrate "reset"', "refusé"],
+  ['docker volume "rm" project0-postgres-data', "refusé"],
+
+  // Bac à sable : un seul chemin hors du temporaire suffit à réarmer la règle.
+  ["rm -rf /tmp/keep ~/Documents", "refusé"],
+  ["rm -rf /tmp/x ../..", "refusé"],
+  ["rm -rf /tmp/x docs", "refusé"],
+
+  // Heredoc : le corps est une donnée, la fin de la ligne d'ouverture non.
+  [
+    "cat <<'EOF' && rm -rf /Users/vibesspace/Project0/docs\ntexte\nEOF",
+    "refusé",
+  ],
+  ["cat <<EOF && git push --force\ntexte\nEOF", "refusé"],
+
+  // Groupes : `(` et `{` ne masquent plus la commande.
+  ["(rm -rf /Users/vibesspace/Project0/docs)", "refusé"],
+  ["{ rm -rf /Users/vibesspace/Project0/docs; }", "refusé"],
+
+  // Lecteurs absents de la liste : ils lisent un fichier comme les autres.
+  ["hexdump -C apps/app/.env.local", "refusé"],
+  ["openssl base64 -in apps/app/.env.local", "refusé"],
+  ["rev apps/app/.env.local", "refusé"],
+  ["split apps/app/.env.local", "refusé"],
+  ["shasum apps/app/.env.local", "refusé"],
+  ["ditto apps/app/.env.local /tmp/x", "refusé"],
+
+  // Destructions non couvertes.
+  ["shred /Users/vibesspace/Project0/docs", "refusé"],
+  ["truncate -s 0 apps/app/.env.local", "refusé"],
+
+  // Faux positifs à ne pas réintroduire : une phrase entre guillemets porte des
+  // espaces, un drapeau non. C'est ce qui distingue les deux.
+  ['git commit -m "docs: git push --force"', "autorisé"],
+  ['git commit -m "chore: ne jamais rm -rf le dossier docs"', "autorisé"],
+  ['echo "-rf"', "autorisé"],
+  ["rm -rf /tmp/audit-seed", "autorisé"],
+  // `~` est bien étendu : ce chemin sort du bac à sable, celui d'en dessous y
+  // reste. L'attente inverse avait été écrite ici par erreur — le garde-fou
+  // avait raison, pas le test.
+  ["rm -rf ~/Documents", "refusé"],
+  ["rm -rf ~/../../tmp/dans-la-zone", "autorisé"],
+
   // Travail normal — ne doit jamais être bloqué.
   ["pnpm lint", "autorisé"],
   ["pnpm typecheck && pnpm test", "autorisé"],

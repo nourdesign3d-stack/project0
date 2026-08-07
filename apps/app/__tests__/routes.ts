@@ -56,16 +56,32 @@ const collect = (directory: string): string[] => {
 export const collectRoutes = (appDir: string): string[] =>
   collect(appDir).map((path) => relative(appDir, path));
 
+export const isDynamic = (route: string): boolean =>
+  route.split(sep).some((segment) => segment.startsWith("["));
+
 /**
  * Chemin de fichier → chemin d'URL, selon les conventions du routeur Next :
- * les groupes `(nom)` disparaissent, les segments dynamiques et attrape-tout
- * sont écartés (aucune valeur ne peut être devinée), le nom de fichier tombe.
+ * les groupes `(nom)` disparaissent, le nom de fichier tombe.
+ *
+ * Renvoie `null` pour une route **dynamique**. La version précédente en retirait
+ * simplement les segments `[id]` : `(authenticated)/items/[id]/page.tsx`
+ * devenait `/items`, une URL qui n'existe pas. Playwright recevait un `404`,
+ * que la liste des refus acceptait — le test passait au vert **sans avoir
+ * jamais touché la route**. Sur une application multi-tenant, la ressource
+ * identifiée par un paramètre est précisément celle qu'il faut contrôler.
+ *
+ * Aucune valeur ne peut être devinée : l'appelant doit en fournir une, ou
+ * déclarer la route comme non couverte. Voir D-033.
  */
-export const toUrlPath = (route: string): string => {
+export const toUrlPath = (route: string): string | null => {
+  if (isDynamic(route)) {
+    return null;
+  }
+
   const segments = route
     .split(sep)
     .slice(0, -1)
-    .filter((segment) => !(segment.startsWith("(") || segment.startsWith("[")));
+    .filter((segment) => !segment.startsWith("("));
 
   return `/${segments.join("/")}`;
 };
