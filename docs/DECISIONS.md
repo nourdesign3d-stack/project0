@@ -202,9 +202,21 @@ la même. Les deux sont corrigées, et la nouvelle formulation rappelle l'exigen
 de locataire (D-069) — c'est le bon endroit pour la dire, au moment où le premier modèle
 va être écrit.
 
-Ces deux défauts partagent une cause : **ce que la graine dit à ses utilisateurs n'est
-exercé par aucun test**. Les squelettes et les messages d'amorçage sont du texte que seul
-un usage réel lit.
+**Une passe complète sur `docs/_skeletons/` en a révélé quatre autres**, tous hérités par
+chaque projet neuf : `Page` listé dans le modèle de domaine alors qu'il est supprimé,
+`relationMode` décrit comme une contrainte active alors qu'il est retiré (D-065), R-002
+livré comme risque ouvert alors qu'il est fermé, et BaseHub encore mentionné (D-031).
+
+Un projet neuf recevait donc un registre de risques contenant un risque **déjà résolu** et
+un modèle de domaine décrivant une table **inexistante**.
+
+Ces défauts partagent une cause : **ce que la graine dit à ses utilisateurs n'est exercé
+par aucun test**. Les squelettes et les messages d'amorçage sont du texte que seul un usage
+réel lit — et jusqu'à aujourd'hui, personne ne l'avait lu.
+
+Un contrôle couvre désormais les deux sens : le squelette doit citer chaque modèle du
+schéma, et ne citer **que** des modèles existants ; il ne doit mentionner aucun élément
+retiré du dépôt. Vu échouer sur chacun des deux.
 
 ---
 

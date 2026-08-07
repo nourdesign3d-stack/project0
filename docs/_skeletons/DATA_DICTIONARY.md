@@ -42,6 +42,4 @@ Retirer les lignes correspondant aux intégrations que le projet n'utilise pas.
   pas d'artefact CI, filtrage avant Sentry.
 - **Conservation** : toute donnée personnelle a une durée de conservation et un moyen de
   suppression **avant** d'être introduite.
-- **Contraintes** : préférer une contrainte de base à une vérification applicative
-  (attention : `relationMode = "prisma"` désactive les clés étrangères — voir
-  `.claude/rules/database.md`).
+- **Contraintes** : préférer une contrainte de base à une vérification applicative — PostgreSQL applique les clés étrangères, s'en servir plutôt que de les émuler en code.
