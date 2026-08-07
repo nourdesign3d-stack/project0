@@ -18,6 +18,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -748,6 +749,89 @@ check("rétention : un fichier étranger n'est jamais candidat", async () => {
     dateFromName("2026-08-07T12-30-00.dump") instanceof Date,
     "un dump valide n'est pas reconnu"
   );
+});
+
+check(
+  "un projet fraîchement initialisé passe le contrôle du dictionnaire",
+  () => {
+    // ⚠️ `DATA_DICTIONARY.md` fait partie des documents remis à zéro par
+    // l'initialisation, mais `WebhookEvent` **reste** dans le schéma : c'est un
+    // modèle d'infrastructure, pas de domaine. Le squelette ne le mentionnait
+    // pas, et `documentation-claims.test.ts` échouait donc sur **tout** projet
+    // neuf — le tout premier `pnpm verify` d'un repreneur (D-072).
+    //
+    // Ce contrôle relie les deux : le squelette doit couvrir chaque modèle que
+    // la graine livre. Il vit ici parce que c'est l'initialisation qui crée le
+    // couplage.
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const schema = readFileSync(
+      join(root, "packages/database/prisma/schema.prisma"),
+      "utf8"
+    );
+    const skeleton = readFileSync(
+      join(root, "docs/_skeletons/DATA_DICTIONARY.md"),
+      "utf8"
+    );
+
+    const models = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map(
+      ([, name]) => name
+    );
+
+    assert(
+      models.length > 0,
+      "aucun modèle trouvé : le chemin a-t-il changé ?"
+    );
+
+    for (const model of models) {
+      assert(
+        skeleton.includes(model),
+        `le squelette du dictionnaire ignore ${model} : un projet neuf échouera à son premier pnpm verify`
+      );
+    }
+  }
+);
+
+check("les squelettes ne parlent que de ce qui existe encore", () => {
+  // ⚠️ `docs/_skeletons/` était le seul dossier du dépôt qu'aucun test ne lisait,
+  // et il a dérivé quatre fois : `Page` supprimé (D-070) mais toujours listé,
+  // `relationMode` retiré (D-065) mais toujours décrit, R-002 fermé mais toujours
+  // livré, BaseHub retiré (D-031) mais toujours mentionné.
+  //
+  // Chaque projet neuf héritait donc d'un modèle inexistant, d'une contrainte
+  // disparue et d'un risque déjà résolu. Relevé par le premier usage réel de la
+  // graine (D-072).
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const schema = readFileSync(
+    join(root, "packages/database/prisma/schema.prisma"),
+    "utf8"
+  );
+  const models = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map(
+    ([, name]) => name
+  );
+
+  // Retiré du dépôt : plus aucun squelette ne doit y renvoyer.
+  const REMOVED = ["relationMode", "BaseHub", "basehub"];
+
+  for (const file of readdirSync(join(root, "docs/_skeletons"))) {
+    const content = readFileSync(join(root, "docs/_skeletons", file), "utf8");
+
+    for (const term of REMOVED) {
+      assert(
+        !content.includes(term),
+        `${file} mentionne « ${term} », retiré du dépôt : un projet neuf en hériterait`
+      );
+    }
+
+    // Un squelette peut nommer un modèle **qui existe**, jamais un disparu.
+    for (const [, named] of content.matchAll(
+      /`(\w+)` \| `packages\/database/g
+    )) {
+      assert(
+        models.includes(named),
+        `${file} décrit le modèle ${named}, absent du schéma`
+      );
+    }
+  }
 });
 
 // --- Exécution --------------------------------------------------------------

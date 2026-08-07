@@ -149,6 +149,77 @@ la protection de `main`.
 
 ---
 
+## D-072 — Le premier usage réel a fait échouer le premier `pnpm verify`
+
+**Date** : 2026-08-07
+**Contexte** : un premier produit a été créé depuis la graine. Son amorçage s'est arrêté
+sur `la vérification a échoué : corriger avant d'aller plus loin` — et l'échec portait sur
+un test que j'avais écrit la veille :
+
+```
+FAIL  __tests__/documentation-claims.test.ts
+AssertionError: le modèle WebhookEvent n'apparaît pas dans docs/DATA_DICTIONARY.md
+```
+
+**Cause** : `DATA_DICTIONARY.md` fait partie des documents remis à zéro par
+l'initialisation — c'est correct, un produit ne doit pas hériter du dictionnaire d'un
+autre. Mais `WebhookEvent` **reste dans le schéma** : c'est un modèle d'infrastructure, pas
+de domaine, et il survit à la remise à zéro. Le squelette ne le mentionnait pas.
+
+Le test de D-057 et la remise à zéro de `project:init` étaient donc **en contradiction**, et
+rien ne les reliait.
+
+**Le squelette était périmé de trois façons** : il listait encore `Page`, supprimé la
+veille (D-070) ; il ignorait `WebhookEvent`, introduit en D-023 ; il mentionnait BaseHub,
+retiré en D-031. Personne ne regarde `docs/_skeletons/` — c'est le seul dossier du dépôt
+qu'aucun test ne lisait.
+
+**Ce qui est corrigé** : le squelette porte les quatre champs de `WebhookEvent`, avec la
+mention qu'ils ne se suppriment pas. Et un contrôle relie désormais les deux — le squelette
+doit couvrir chaque modèle que la graine livre. Vu échouer.
+
+### Ce que ce cas enseigne, et il vaut les trois audits
+
+C'est le **premier usage réel** de la graine, et il a trouvé en quelques secondes un défaut
+que trois audits externes n'avaient pas vu — parce qu'aucun n'a exécuté `project:init` puis
+`pnpm verify`. Le défaut n'existe que dans l'état **après initialisation**, un état que le
+dépôt lui-même ne présente jamais.
+
+Un test qui lit un document remis à zéro par l'initialisation est **couplé à l'initialisation**,
+que son auteur le sache ou non. Il en reste deux dans ce dépôt — `onboarding.test.ts` lit
+le README, `setup-guide.test.ts` lit `SETUP.md` — et ni l'un ni l'autre n'est dans la liste
+des documents remis à zéro. Vérifié, pas supposé.
+
+**La leçon générale** : une graine ne se teste pas dans son propre dépôt. Elle se teste dans
+un clone initialisé. C'est la seule vérification qui exerce l'état que reçoivent réellement
+ses utilisateurs.
+
+**Deuxième défaut trouvé par le même usage**, dans la minute qui a suivi : le message final
+de `vibe0` prescrivait « remplacer le stub Prisma `Page` par le premier vrai modèle ».
+`Page` avait été supprimé la veille (D-070). Le repreneur recevait donc, en dernier mot de
+son amorçage, une instruction portant sur un modèle inexistant. `project-init.mjs` portait
+la même. Les deux sont corrigées, et la nouvelle formulation rappelle l'exigence de filtre
+de locataire (D-069) — c'est le bon endroit pour la dire, au moment où le premier modèle
+va être écrit.
+
+**Une passe complète sur `docs/_skeletons/` en a révélé quatre autres**, tous hérités par
+chaque projet neuf : `Page` listé dans le modèle de domaine alors qu'il est supprimé,
+`relationMode` décrit comme une contrainte active alors qu'il est retiré (D-065), R-002
+livré comme risque ouvert alors qu'il est fermé, et BaseHub encore mentionné (D-031).
+
+Un projet neuf recevait donc un registre de risques contenant un risque **déjà résolu** et
+un modèle de domaine décrivant une table **inexistante**.
+
+Ces défauts partagent une cause : **ce que la graine dit à ses utilisateurs n'est exercé
+par aucun test**. Les squelettes et les messages d'amorçage sont du texte que seul un usage
+réel lit — et jusqu'à aujourd'hui, personne ne l'avait lu.
+
+Un contrôle couvre désormais les deux sens : le squelette doit citer chaque modèle du
+schéma, et ne citer **que** des modèles existants ; il ne doit mentionner aucun élément
+retiré du dépôt. Vu échouer sur chacun des deux.
+
+---
+
 ## D-071 — Le cache Turborepo avait atteint 43 Go
 
 **Date** : 2026-08-07

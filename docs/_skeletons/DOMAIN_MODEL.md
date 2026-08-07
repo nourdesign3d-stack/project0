@@ -17,7 +17,7 @@ Rôles internes, permissions par rôle et hiérarchie : à définir.
 
 | Entité | Modèle Prisma | Statut |
 | --- | --- | --- |
-| `Page` | `packages/database/prisma/schema.prisma` | **stub de démonstration**, à supprimer dès qu'un vrai modèle existe |
+| `WebhookEvent` | `packages/database/prisma/schema.prisma` | **infrastructure**, pas du domaine : garantit l'idempotence des webhooks. Ne pas supprimer |
 
 ## États et transitions
 
