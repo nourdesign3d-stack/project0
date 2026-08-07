@@ -17,17 +17,33 @@ import { claimEvent, completeEvent, releaseEvent } from "@/lib/idempotency";
 
 const PROVIDER = "clerk";
 
+/**
+ * Attributs transmis à l'outil d'analytique.
+ *
+ * ⚠️ Cette fonction envoyait `email`, `firstName`, `lastName`, `phoneNumber` et
+ * l'URL de la photo — à chaque création et à chaque mise à jour d'utilisateur.
+ * Quatre identifiants directs et une image de personne partaient donc vers un
+ * sous-traitant, **sans chemin de retour** : supprimer un compte pose ici un
+ * marqueur `deleted` et n'efface rien chez le destinataire. Relevé en audit le
+ * 2026-08-07 (D-043).
+ *
+ * Ne subsistent que l'identifiant **pseudonyme** de Clerk — nécessaire pour
+ * rattacher les événements entre eux — et la date de création, qui sert aux
+ * cohortes sans désigner personne.
+ *
+ * Un projet dérivé qui a besoin de retrouver un utilisateur par son e-mail dans
+ * l'interface de l'outil peut élargir ce jeu : ce sera alors une décision prise,
+ * inscrite dans `RISKS.md` et déclarée aux personnes concernées — pas un défaut
+ * hérité de la graine.
+ */
+const publicProperties = (data: UserJSON) => ({
+  createdAt: new Date(data.created_at),
+});
+
 const handleUserCreated = (data: UserJSON) => {
   analytics?.identify({
     distinctId: data.id,
-    properties: {
-      email: data.email_addresses.at(0)?.email_address,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      createdAt: new Date(data.created_at),
-      avatar: data.image_url,
-      phoneNumber: data.phone_numbers.at(0)?.phone_number,
-    },
+    properties: publicProperties(data),
   });
 
   analytics?.capture({
@@ -41,14 +57,7 @@ const handleUserCreated = (data: UserJSON) => {
 const handleUserUpdated = (data: UserJSON) => {
   analytics?.identify({
     distinctId: data.id,
-    properties: {
-      email: data.email_addresses.at(0)?.email_address,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      createdAt: new Date(data.created_at),
-      avatar: data.image_url,
-      phoneNumber: data.phone_numbers.at(0)?.phone_number,
-    },
+    properties: publicProperties(data),
   });
 
   analytics?.capture({
@@ -174,20 +183,30 @@ export const POST = async (request: Request): Promise<Response> => {
   // échouer une signature pourtant valide (ordre des clés, espaces, unicode).
   const body = await request.text();
 
-  // Create a new SVIX instance with your secret.
-  const webhook = new Webhook(env.CLERK_WEBHOOK_SECRET);
-
   let event: WebhookEvent | undefined;
 
-  // Verify the payload with the headers
   try {
+    // ⚠️ La construction est **dans** le try. `new Webhook(secret)` lève sur un
+    // secret mal formé — une valeur tronquée à la copie, un préfixe `whsec_`
+    // oublié — et l'exception remontait alors non capturée : Next répondait 500,
+    // Clerk réessayait, et chaque réessai reproduisait le même 500. Une faute de
+    // frappe dans une variable d'environnement produisait ainsi une boucle de
+    // réessais infinie sur une route publique. Relevé en audit le 2026-08-07
+    // (D-046).
+    const webhook = new Webhook(env.CLERK_WEBHOOK_SECRET);
+
     event = webhook.verify(body, {
       "svix-id": svixId,
       "svix-timestamp": svixTimestamp,
       "svix-signature": svixSignature,
     }) as WebhookEvent;
   } catch (error) {
+    // 400 et non 5xx : Clerk réessaie sur 5xx, or ni une signature invalide ni
+    // un secret mal configuré ne deviendront valides par un réessai. Le second
+    // cas est journalisé pour être vu — c'est une erreur d'exploitation, pas un
+    // appel forgé.
     log.error("Error verifying webhook:", { error });
+
     return new Response("Error occured", {
       status: 400,
     });

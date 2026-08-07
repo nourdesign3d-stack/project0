@@ -11,9 +11,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 let requestHeaders: Record<string, string> = {};
 let configured = true;
+let malformedSecret = false;
 
 const verify = vi.fn();
 const logInfo = vi.fn();
+const identify = vi.fn();
 const createEvent = vi.fn();
 const deleteEvent = vi.fn();
 const updateEvent = vi.fn();
@@ -36,6 +38,12 @@ vi.mock("@repo/database", () => ({
 
 vi.mock("svix", () => ({
   Webhook: class {
+    constructor() {
+      if (malformedSecret) {
+        throw new Error("Invalid secret");
+      }
+    }
+
     verify(...args: unknown[]) {
       return verify(...args);
     }
@@ -50,7 +58,7 @@ vi.mock("next/headers", () => ({
 // Ces modules importent `server-only`, qui lève hors contexte serveur.
 vi.mock("@repo/analytics/server", () => ({
   analytics: {
-    identify: vi.fn(),
+    identify: (...args: unknown[]) => identify(...args),
     capture: vi.fn(),
     groupIdentify: vi.fn(),
     shutdown: vi.fn(),
@@ -93,8 +101,10 @@ describe("webhook Clerk", () => {
   beforeEach(() => {
     vi.resetModules();
     configured = true;
+    malformedSecret = false;
     verify.mockReset();
     logInfo.mockReset();
+    identify.mockReset();
     createEvent.mockReset();
     createEvent.mockResolvedValue(undefined);
     deleteEvent.mockReset();
@@ -103,6 +113,83 @@ describe("webhook Clerk", () => {
     updateEvent.mockResolvedValue(undefined);
     updateManyEvents.mockReset();
     updateManyEvents.mockResolvedValue({ count: 0 });
+  });
+
+  test("ne transmet aucun identifiant direct à l'outil d'analytique", async () => {
+    // Ces attributs partaient à chaque création et mise à jour d'utilisateur,
+    // vers un sous-traitant, sans chemin de retour : supprimer un compte pose un
+    // marqueur et n'efface rien chez le destinataire (D-043).
+    const user = {
+      id: "user_1",
+      created_at: 1_700_000_000_000,
+      email_addresses: [{ email_address: "personne@exemple.test" }],
+      first_name: "Prénom",
+      last_name: "Nom",
+      phone_numbers: [{ phone_number: "+33600000000" }],
+      image_url: "https://img.clerk.test/personne.jpg",
+    };
+
+    verify.mockReturnValue({ type: "user.created", data: user });
+
+    await post("{}", SIGNED_HEADERS);
+
+    const transmitted = JSON.stringify(identify.mock.calls);
+
+    for (const value of [
+      "personne@exemple.test",
+      "Prénom",
+      "Nom",
+      "+33600000000",
+      "personne.jpg",
+    ]) {
+      expect(
+        transmitted.includes(value),
+        `« ${value} » est transmis à l'outil d'analytique`
+      ).toBe(false);
+    }
+
+    // …mais le rattachement pseudonyme, lui, doit continuer de fonctionner.
+    expect(transmitted).toContain("user_1");
+  });
+
+  test("transmet les mêmes attributs à la mise à jour qu'à la création", async () => {
+    // Les deux gestionnaires portaient le même bloc dupliqué : corriger l'un et
+    // oublier l'autre laisserait la fuite ouverte sur le chemin le plus fréquent.
+    const user = {
+      id: "user_2",
+      created_at: 1_700_000_000_000,
+      email_addresses: [{ email_address: "autre@exemple.test" }],
+      first_name: "Autre",
+      last_name: "Personne",
+      phone_numbers: [{ phone_number: "+33611111111" }],
+      image_url: "https://img.clerk.test/autre.jpg",
+    };
+
+    verify.mockReturnValue({ type: "user.updated", data: user });
+
+    await post("{}", SIGNED_HEADERS);
+
+    const transmitted = JSON.stringify(identify.mock.calls);
+
+    expect(transmitted).not.toContain("autre@exemple.test");
+    expect(transmitted).not.toContain("+33611111111");
+    expect(transmitted).toContain("user_2");
+  });
+
+  test("un secret mal formé ne provoque pas de boucle de réessais", async () => {
+    // `new Webhook(secret)` lève sur une valeur tronquée ou sans préfixe.
+    // L'exception remontait non capturée : Next répondait 500, Clerk réessayait,
+    // et chaque réessai reproduisait le même 500. Une faute de frappe dans une
+    // variable d'environnement suffisait (D-046).
+    malformedSecret = true;
+
+    const response = await post('{"type":"user.created"}', SIGNED_HEADERS);
+
+    expect(
+      response.status,
+      "un 5xx déclenche les réessais de Clerk, or un secret mal formé ne " +
+        "deviendra pas valide en réessayant"
+    ).toBeLessThan(500);
   });
 
   test("refuse une requête sans en-têtes Svix", async () => {

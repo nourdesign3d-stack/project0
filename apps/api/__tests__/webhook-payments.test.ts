@@ -278,6 +278,47 @@ describe("webhook Stripe", () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
+  test("signale une réservation qu'il n'a pas pu libérer", async () => {
+    // L'échec de la libération produit exactement la perte que l'idempotence
+    // existe pour empêcher : la réservation survit, le réessai du fournisseur
+    // est pris pour un doublon, l'événement disparaît. Stripe, lui, a vu un 200.
+    // Sans ce journal, rien dans le système ne peut le signaler.
+    getUserList.mockRejectedValue(new Error("Clerk injoignable"));
+    deleteEvent.mockRejectedValue(new Error("base injoignable"));
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    const messages = logError.mock.calls.map(([message]) => String(message));
+
+    expect(
+      messages.some(
+        (message) => message.includes("evt_1") && message.includes("stripe")
+      ),
+      "aucun journal ne porte le fournisseur et l'identifiant de l'événement perdu"
+    ).toBe(true);
+  });
+
+  test("ne signale rien quand la réservation avait déjà disparu", async () => {
+    // P2025 : la ligne n'existe pas. Sans conséquence, et attendu si deux
+    // chemins libèrent le même événement — journaliser ici ferait du bruit.
+    getUserList.mockRejectedValue(new Error("Clerk injoignable"));
+    deleteEvent.mockRejectedValue(
+      Object.assign(new Error("not found"), { code: "P2025" })
+    );
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    const messages = logError.mock.calls.map(([message]) => String(message));
+
+    expect(messages.some((message) => message.includes("non libérée"))).toBe(
+      false
+    );
+  });
+
   test("libère la réservation quand le traitement échoue", async () => {
     // Sans libération, le réessai serait pris pour un doublon et l'événement
     // perdu en silence — l'inverse du but recherché.

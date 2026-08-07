@@ -116,7 +116,7 @@ if (created.length > 0) {
     DATABASE_URL pointe sur ${databaseUrl}
     → démarrer la base : docker compose up -d
 
-    Les variables des services tiers (Clerk, Stripe, BaseHub, Resend…) sont
+    Les variables des services tiers (Clerk, Stripe, Resend, Sentry…) sont
     commentées : les décommenter au fur et à mesure, avec de vraies clés.
     Sans clé Clerk, l'application démarre mais les pages d'authentification
     ne s'affichent pas.

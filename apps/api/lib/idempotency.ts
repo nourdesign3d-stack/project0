@@ -125,16 +125,53 @@ export const completeEvent = async (
   }
 };
 
+// Prisma signale par ce code une suppression dont la cible n'existe pas.
+const RECORD_NOT_FOUND = "P2025";
+
+const isMissing = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: unknown }).code === RECORD_NOT_FOUND;
+
 /**
  * Libère la réservation quand le traitement a échoué : sans cela, l'événement
  * serait tenu pour traité et le réessai du fournisseur serait ignoré — une
  * perte silencieuse, exactement ce que l'idempotence est censée éviter.
+ *
+ * ⚠️ Cette fonction avalait **toute** erreur (`.catch(() => undefined)`). Or son
+ * échec produit précisément la perte qu'elle existe pour empêcher : la
+ * réservation survit, le réessai du fournisseur est pris pour un doublon, et
+ * l'événement disparaît sans que rien ne le signale — le fournisseur, lui, a vu
+ * un `200`. Relevé en audit le 2026-08-07 (D-041).
+ *
+ * Deux cas, désormais distingués :
+ *
+ *  - **`P2025`, la ligne n'existe pas** : sans conséquence, et attendu si deux
+ *    chemins libèrent le même événement. Ignoré en silence.
+ *  - **tout le reste** — base injoignable, contrainte, délai dépassé : journalisé
+ *    avec le fournisseur et l'identifiant d'événement, seuls éléments permettant
+ *    de retrouver ce qui a été perdu chez le fournisseur et de le rejouer à la
+ *    main. L'erreur n'est pas propagée : l'appelant est déjà dans son chemin
+ *    d'échec, et la masquer d'une seconde erreur ne l'aiderait pas.
  */
 export const releaseEvent = async (
   provider: string,
   eventId: string
 ): Promise<void> => {
-  await database.webhookEvent
-    .delete({ where: { provider_eventId: { provider, eventId } } })
-    .catch(() => undefined);
+  try {
+    await database.webhookEvent.delete({
+      where: { provider_eventId: { provider, eventId } },
+    });
+  } catch (error) {
+    if (isMissing(error)) {
+      return;
+    }
+
+    log.error(
+      `webhook ${provider} : réservation ${eventId} non libérée — le réessai ` +
+        `du fournisseur sera pris pour un doublon et l'événement perdu. ` +
+        parseError(error)
+    );
+  }
 };
