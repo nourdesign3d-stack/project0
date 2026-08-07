@@ -106,7 +106,25 @@ export const ContactForm = ({ dictionary }: ContactFormProps) => {
                 <Input id="picture" type="file" />
               </div>
 
-              <Button className="w-full gap-4">
+              {/*
+                ⚠️ Bouton **désactivé, et c'est délibéré**.
+                
+                Ce formulaire est une maquette du gabarit : ses champs (date,
+                prénom, nom, dépôt de CV) décrivent une prise de rendez-vous,
+                alors que la seule action serveur existante — `actions/contact`,
+                durcie et testée — envoie un message (nom, e-mail, texte). Rien
+                ne les relie, et **rien n'importait cette action** : le bouton ne
+                déclenchait absolument rien.
+                
+                Un formulaire public qui donne l'apparence de fonctionner est un
+                piège hérité par chaque projet cloné. Le désactiver coûte un mot
+                et supprime le piège ; le raccorder suppose de **décider ce que
+                cette page doit faire** — prendre un rendez-vous ou recevoir un
+                message — ce qui est un arbitrage de produit, pas un correctif.
+                
+                Relevé en réaudit le 2026-08-07 (D-066, R-028).
+              */}
+              <Button className="w-full gap-4" disabled type="button">
                 {dictionary.web.contact.hero.form.cta}{" "}
                 <MoveRight className="h-4 w-4" />
               </Button>

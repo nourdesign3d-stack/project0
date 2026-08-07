@@ -7,9 +7,22 @@ generator client {
 }
 
 datasource db {
-  provider     = "postgresql"
-  relationMode = "prisma"
+  provider = "postgresql"
 }
+
+// ⚠️ `relationMode = "prisma"` a été retiré le 2026-08-07 (D-065).
+//
+// Ce mode existe pour les bases qui **ne savent pas** appliquer de clés
+// étrangères — PlanetScale à l'origine. Sur PostgreSQL, qui les applique très
+// bien, c'était un affaiblissement pur : on renonçait à une garantie de la base
+// pour la confier à du code qu'il aurait fallu écrire, relire et tester à chaque
+// suppression. R-002 le classait « élevée / haute » depuis le premier jour, avec
+// pour seul contrôle une règle écrite — et une règle écrite n'est pas une
+// contrainte.
+//
+// Le retrait ne coûte **rien aujourd'hui** : aucune relation n'existe encore,
+// donc aucune contrainte à créer, donc aucune migration. Il aurait coûté une
+// reprise de données au premier modèle métier.
 
 // This is a stub model.
 // Delete it and add your own Prisma models.

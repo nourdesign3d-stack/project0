@@ -149,6 +149,124 @@ la protection de `main`.
 
 ---
 
+## D-068 — L'absence de relecture indépendante est inscrite comme risque
+
+**Date** : 2026-08-07
+**Contexte** : un troisième audit externe a identifié le constat structurant de ce dépôt, et
+ce n'est pas une faiblesse technique. **59 commits, un auteur.** La protection de `main`
+exige la CI mais **pas la revue** — à un seul mainteneur, GitHub interdit d'approuver sa
+propre PR. Or `SECURITY_MODEL.md` accordait au contributeur une confiance « élevée mais
+auditée (**revue** + CI) », seize lignes au-dessus du passage qui établit le contraire.
+
+Les conséquences sont mesurables, et l'audit les a mesurées : **onze corrections appliquées
+à un site sur deux** — le formulaire durci mais pas les server actions, le canal Sentry
+fermé mais pas le canal `log`, l'identifiant de corrélation posé sur un webhook et pas sur
+l'autre — et **quatorze affirmations devenues fausses en deux jours**.
+
+Ce n'est pas un défaut de méthode : c'est ce qui arrive quand personne ne relit. Un auteur
+qui corrige son propre code cherche la correction qu'il a en tête, pas les autres
+occurrences du motif.
+
+**Ce qui est fait** : R-028 inscrit, accepté, avec propriétaire et déclencheur. Les
+affirmations vérifiables sont exécutoires (D-057, D-063). Les contrôles CI sont requis.
+
+**Ce qui n'est pas fait, et ne se corrige pas par du code** : il n'y a toujours pas de
+second regard permanent. Trois audits externes en ont tenu lieu — mais ils sont ponctuels.
+Le dire vaut mieux que laisser un document affirmer une revue qui n'existe pas.
+
+---
+
+## D-067 — Une répétition de restauration vaut pour le code qu'elle a éprouvé
+
+**Date** : 2026-08-07
+**Contexte** : trois documents écrivaient que la restauration était « éprouvée ». Elle
+l'avait été le 2026-08-05 — sur un module de connexion **modifié deux fois depuis**
+(D-047 : traduction hôte → conteneur ; D-062 : script planifié). Le code testé n'existait
+plus.
+
+Règle adoptée : **une répétition est rattachée à un commit**, ou elle ne prouve rien.
+
+**Rejouée le 2026-08-07** sur le code en vigueur : sauvegarde de 5600 octets en `600`,
+base cible passée de zéro table à trois avec ses trois migrations, source intacte.
+
+**Découvert au passage, et non documenté jusqu'ici** : `--to local` ne vise **pas** la base
+de travail. Il restaure dans la base `postgres` du conteneur, pas dans celle que désigne
+`DATABASE_URL`. C'est le bon comportement — c'est ce qui permet de restaurer *ailleurs que
+sur la source*, seule répétition qui prouve la sauvegarde sans mettre en jeu ce qu'elle
+protège — mais aucun document ne le disait, et l'opérateur pouvait croire qu'il écrasait sa
+base.
+
+---
+
+## D-066 — Le formulaire de contact ne prétend plus fonctionner
+
+**Date** : 2026-08-07
+**Contexte** : **rien n'importait `actions/contact`.** Le bouton du formulaire public de
+`apps/web` ne déclenchait absolument rien.
+
+Ce constat est sévère pour le cycle précédent : l'action a été durcie le 2026-08-07 (clé de
+limitation de débit, messages d'erreur), **six tests** ont été écrits pour elle, et un
+**exécuteur Vitest complet** a été ajouté à `apps/web` — pour du code que personne
+n'appelle. Personne n'avait vérifié qu'il était branché.
+
+Un formulaire public qui donne l'apparence de fonctionner est un piège **hérité par chaque
+projet cloné**. Le bouton est désactivé : cela coûte un mot et supprime le piège.
+
+**Le raccorder est un arbitrage de produit, pas un correctif.** Les champs du formulaire
+(date, prénom, nom, dépôt de CV) et son dictionnaire (« Réservez une réunion ») décrivent
+une prise de rendez-vous ; l'action envoie un message. Décider laquelle des deux est la
+bonne appartient au propriétaire — R-029.
+
+**Ce que ce cas enseigne** : avant de durcir quelque chose, vérifier qu'il est appelé. Le
+travail de sécurisation d'hier était juste, testé, argumenté — et sans objet.
+
+---
+
+## D-065 — `relationMode = "prisma"` retiré tant que c'était gratuit
+
+**Date** : 2026-08-07
+**Contexte** : R-002 était classé **élevée / haute** depuis l'initialisation, avec pour seul
+contrôle une règle écrite dans `.claude/rules/database.md`. Une règle écrite n'est pas une
+contrainte — c'est le motif que trois audits ont démonté.
+
+Ce mode existe pour les bases qui **ne savent pas** appliquer de clés étrangères. Sur
+PostgreSQL, qui les applique très bien, c'était un affaiblissement pur : on renonçait à une
+garantie de la base pour la confier à du code qu'il aurait fallu écrire, relire et tester à
+chaque suppression.
+
+**Le retrait n'a coûté qu'une ligne.** Aucune relation n'existe encore dans le schéma, donc
+aucune contrainte à créer, donc **aucune migration** — `migrate:status` confirme « schema is
+up to date » après retrait. Au premier modèle métier, il aurait fallu créer les contraintes
+et nettoyer d'éventuelles lignes orphelines d'abord.
+
+C'est le meilleur rapport coût/valeur de tout le réaudit, et il tient à une fenêtre : elle
+se referme au premier commit métier.
+
+---
+
+## D-064 — Un service optionnel pouvait faire traiter un paiement deux fois
+
+**Date** : 2026-08-07
+**Contexte** : dans les deux webhooks, `await analytics?.shutdown()` s'exécutait **avant**
+`completeEvent()`.
+
+`shutdown()` attend que l'analytique ait vidé sa file — jusqu'à trente secondes, vers un
+service **optionnel**, dont l'absence de clé est un cas normal. S'il traînait ou échouait,
+`completeEvent` ne s'exécutait pas : la réservation restait inachevée, la reprise de D-049
+la reprenait quinze minutes plus tard, et **l'événement était traité deux fois**.
+
+Sur un webhook de paiement, cela signifie un traitement financier dupliqué — provoqué par
+un service qui n'est même pas requis pour que l'application fonctionne.
+
+Cinq décisions individuellement correctes avaient accumulé cette durée sans que personne ne
+regarde leur composition. **La correction est un déplacement de ligne**, et c'est le
+meilleur exemple de ce que seule une lecture transversale peut trouver : chaque élément
+était juste.
+
+Un test constate l'ordre plutôt que le résultat — vu échouer sur l'ordre d'avant.
+
+---
+
 ## D-063 — Un guide d'initialisation, dont la couverture est vérifiée
 
 **Date** : 2026-08-07

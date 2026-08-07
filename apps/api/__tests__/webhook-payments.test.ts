@@ -23,6 +23,7 @@ let requestHeaders: Record<string, string> = {};
 let configured = true;
 
 const capture = vi.fn();
+const shutdown = vi.fn();
 const logError = vi.fn();
 const getUserList = vi.fn();
 const createEvent = vi.fn();
@@ -57,7 +58,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@repo/analytics/server", () => ({
   analytics: {
     capture: (...args: unknown[]) => capture(...args),
-    shutdown: vi.fn(),
+    shutdown: (...args: unknown[]) => shutdown(...args),
   },
 }));
 
@@ -122,6 +123,8 @@ describe("webhook Stripe", () => {
     vi.resetModules();
     configured = true;
     capture.mockReset();
+    shutdown.mockReset();
+    shutdown.mockResolvedValue(undefined);
     logError.mockReset();
     getUserList.mockReset();
     getUserList.mockResolvedValue({ data: [], totalCount: 0 });
@@ -442,5 +445,34 @@ describe("webhook Stripe", () => {
 
     expect(where.completedAt).toBeNull();
     expect(where.receivedAt).toHaveProperty("lt");
+  });
+
+  test("marque l'événement abouti avant de vider l'analytique", async () => {
+    // `shutdown()` attend la file d'un service optionnel — jusqu'à 30 s. Placé
+    // avant, il pouvait empêcher `completeEvent` de s'exécuter : la réservation
+    // restait inachevée, la reprise la reprenait, et l'événement de paiement
+    // était traité deux fois (D-064).
+    const ordre: string[] = [];
+
+    updateEvent.mockImplementation(() => {
+      ordre.push("terminé");
+
+      return Promise.resolve(undefined);
+    });
+    shutdown.mockImplementation(() => {
+      ordre.push("analytique");
+
+      return Promise.resolve(undefined);
+    });
+
+    const body = event("checkout.session.completed", { customer: "cus_1" });
+
+    await post(body, { "stripe-signature": sign(body) });
+
+    expect(
+      ordre,
+      "l'analytique est vidée avant que l'événement soit marqué abouti : " +
+        "un service optionnel peut provoquer un double traitement"
+    ).toEqual(["terminé", "analytique"]);
   });
 });

@@ -195,12 +195,21 @@ export const POST = async (request: Request): Promise<Response> => {
       }
     }
 
-    await analytics?.shutdown();
-
     // Marquer **abouti**. Sans cela, la réservation reste indistinguable d'un
     // traitement interrompu et sera reprise après le délai de péremption : le
     // même événement serait traité deux fois (D-049).
     await completeEvent(PROVIDER, event.id);
+
+    // ⚠️ **Après** avoir marqué l'événement abouti, jamais avant.
+    //
+    // `shutdown()` attend que l'analytique ait vidé sa file — jusqu'à trente
+    // secondes, vers un service **optionnel**. Placé avant, il pouvait empêcher
+    // `completeEvent` de s'exécuter : la réservation restait inachevée, la
+    // reprise la reprenait quinze minutes plus tard, et **l'événement était
+    // traité deux fois**. Sur un webhook de paiement, cela signifie un
+    // traitement financier dupliqué — provoqué par un service qui n'est même pas
+    // requis. Relevé en réaudit le 2026-08-07 (D-064).
+    await analytics?.shutdown();
 
     // Réponse minimale : elle part vers un tiers. La version précédente y
     // renvoyait l'événement entier — identité du client, montant, adresse.
