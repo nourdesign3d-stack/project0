@@ -157,7 +157,16 @@ jobs:
       # ⚠️ GitHub caviarde les secrets dans les journaux, **jamais** dans les
       # artefacts. Un rapport Playwright contient traces, vidéos et captures :
       # les parcours manipulant des identifiants doivent les désactiver
-      # eux-mêmes (voir e2e/tests/access-control.spec.ts, D-037).
+      # eux-mêmes — c'est `e2e/tests/authenticated-journey.spec.ts`, isolé dans
+      # son propre fichier pour cela (D-037), et
+      # `apps/api/__tests__/e2e-artifacts.test.ts` le rend exécutoire.
+      #
+      # ⚠️ **Le dépôt est public depuis le 2026-08-07.** Ces artefacts ne sont
+      # plus téléchargeables par les seuls collaborateurs mais par **tout le
+      # monde**, sans authentification. Le modèle de menace a changé sans que ce
+      # commentaire le dise (D-055) : avant d'ajouter un artefact ici — rapport
+      # de couverture, journal de build, capture — se demander qui pourra le
+      # télécharger, et non qui devrait.
       - name: Rapport Playwright
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
