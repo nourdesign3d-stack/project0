@@ -111,6 +111,151 @@ seul outil de graphe.
 
 ---
 
+## D-048 — La protection de `main` est enfin côté serveur
+
+**Date** : 2026-08-07
+**Contexte** : R-011 était **accepté** depuis le 2026-08-05 — la seule protection de
+`main` était un hook `pre-push` local, contournable et limité aux postes qui l'avaient
+installé. La cause était administrative : dépôt privé sur plan gratuit, l'API répondant
+`403 — Upgrade to GitHub Pro or make this repository public`.
+
+Le passage en public du 2026-08-07 a levé la contrainte. Un audit l'a relevé le jour
+même : la protection était **redevenue possible sans que personne ne le remarque**, et
+trois documents affirmaient encore qu'elle était refusée.
+
+**Appliqué** : `Lint · Typecheck · Test · Build` et `Semgrep` requis, poussée forcée et
+suppression de branche interdites, conversations résolues avant fusion.
+
+**Deux limites assumées**, à nommer plutôt que laisser croire à une protection complète :
+la **revue n'est pas exigée** — à un seul mainteneur, GitHub interdit d'approuver sa
+propre PR, et l'exiger bloquerait toute fusion ; les **administrateurs ne sont pas soumis
+à la règle**, ce qui laisse une sortie de secours en incident. C'est une confiance
+accordée au propriétaire, pas un contrôle.
+
+**Ce que ce cas enseigne** : une contrainte externe disparue ne se signale pas
+d'elle-même. Un risque accepté pour une raison qui n'existe plus reste marqué accepté
+jusqu'à ce que quelqu'un aille regarder — d'où l'utilité d'un registre qui **nomme la
+cause** de l'acceptation, et pas seulement le fait de l'accepter.
+
+---
+
+## D-047 — La sauvegarde échouait dès que le port Postgres n'était pas 5432
+
+**Date** : 2026-08-07
+**Contexte** : les outils Postgres s'exécutent **dans** le conteneur (D-027 : la version
+du client doit suivre celle du serveur). Mais `DATABASE_URL` décrit la base telle que
+l'**hôte** la voit — `localhost:<POSTGRES_PORT>`, le port publié par `compose.yaml`. Dans
+le conteneur, `localhost` désigne le conteneur lui-même, et Postgres y écoute toujours
+sur 5432.
+
+Tant que `POSTGRES_PORT` valait 5432, les deux points de vue coïncidaient et personne ne
+voyait le problème. Dès qu'il change — parce que 5432 est déjà pris sur le poste, ce que
+`.env.example` recommande justement de vérifier — la sauvegarde échouait sur un refus de
+connexion **dont le message ne désignait pas la cause**.
+
+`forContainer(url)` traduit désormais une URL locale vers le point de vue du conteneur.
+Une URL distante n'est jamais réécrite : elle est déjà exprimée du point de vue du
+réseau, et la traduire ferait pointer la sauvegarde sur le conteneur local — l'erreur
+serait alors silencieuse et bien pire. Trois tests couvrent les trois cas (local, distant,
+illisible).
+
+---
+
+## D-046 — Un secret Clerk mal formé produisait une boucle de réessais
+
+**Date** : 2026-08-07
+**Contexte** : `new Webhook(secret)` était construit **hors** du `try`. Il lève sur un
+secret mal formé — valeur tronquée à la copie, préfixe `whsec_` oublié. L'exception
+remontait non capturée : Next répondait `500`, Clerk réessayait, et chaque réessai
+reproduisait le même `500`.
+
+Une faute de frappe dans une variable d'environnement suffisait donc à installer une
+**boucle de réessais** sur une route publique, sur un dépôt qui n'a ni pare-feu ni
+limitation de débit (R-003).
+
+La construction est passée dans le `try` existant. Le refus est un `400` : ni une
+signature invalide ni un secret mal configuré ne deviendront valides par un réessai. Le
+second cas est journalisé — c'est une erreur d'exploitation, pas un appel forgé.
+
+---
+
+## D-045 — Le filtre Sentry ne connaissait qu'un emplacement de secret sur trois
+
+**Date** : 2026-08-07
+**Contexte** : D-035 avait élargi le filtre au raisonnement **mot par mot**, corrigeant
+son ancrage en début de chaîne. Mais il n'a jamais regardé que la **chaîne de requête**.
+
+Or un secret voyage dans une URL par trois emplacements : `?cle=…`, le **fragment**
+`#access_token=…` — la forme qu'emploient les redirections OAuth implicites — et la
+partie *userinfo* `postgresql://user:motdepasse@hôte/`. Les deux derniers passaient
+intacts, alors que le commentaire annonçait qu'une URL était bornée.
+
+Le filtre coupe désormais au premier séparateur (`?` ou `#`) et retire la partie
+*userinfo* de toute adresse. Effet de bord accepté : un `#` légitime dans une adresse
+disparaît aussi — on perd du contexte plutôt que de laisser fuir un jeton. Un `#`
+**hors** adresse (numéro de ticket, code couleur) est laissé intact, et un test l'exige.
+
+**Deux formes restent hors de portée, et le code le dit maintenant** : un secret placé
+dans un **segment de chemin** (`/reset/SECRET`) est indiscernable d'un identifiant de
+ressource, et un secret dans un mot sans `/` ni schéma n'est pas une adresse. Ce filtre
+borne les URL ; il ne remplace pas la règle « ne jamais journaliser de valeur sensible ».
+
+---
+
+## D-044 — L'inventaire de routes ignorait trois formes de points d'entrée
+
+**Date** : 2026-08-07
+**Contexte** : l'inventaire qui alimente les deux contrôles de R-013 ne connaissait que
+`page.tsx` et `route.ts`. Or Next accepte les mêmes noms avec **cinq extensions**
+(`js`, `jsx`, `ts`, `tsx`, `mjs`) et reconnaît aussi `default` pour les routes
+parallèles. Un `route.tsx` ou un `page.ts` — noms parfaitement valides, qu'un éditeur
+crée sans qu'on y pense — n'était donc **pas inventorié**.
+
+Les **server actions** n'y figuraient pas davantage, alors que Next les expose par un
+`POST` avec un identifiant d'action : ce sont des points d'entrée HTTP à part entière,
+qui doivent porter leur propre contrôle.
+
+Une route hors inventaire n'est pas « mal testée » : elle n'est pas testée. Et c'est le
+plancher de R-013, le seul contrôle qui tourne sans serveur.
+
+Corrigé aussi côté exécution : une server action n'a pas d'URL, `toUrlPath` renvoie
+`null` pour elle. Sans quoi `actions/users/get.ts` produisait `/actions/users`, une URL
+inexistante dont le `404` figurait parmi les statuts de refus acceptés — le test passait
+**sans avoir rien touché**.
+
+**Preuve** : dix sondes dans un dossier temporaire, dont cinq échouaient sur l'inventaire
+d'avant. Les sondes vivent hors de `app/` : y poser de vrais fichiers créerait de vraies
+routes.
+
+---
+
+## D-043 — Les identifiants directs ne partent plus vers l'outil d'analytique
+
+**Date** : 2026-08-07
+**Décidé par** : propriétaire produit, 2026-08-07.
+**Contexte** : `handleUserCreated` et `handleUserUpdated` transmettaient à PostHog
+l'`email`, le `firstName`, le `lastName`, le `phoneNumber` et l'URL de la photo — à
+chaque création **et à chaque mise à jour** d'utilisateur.
+
+Quatre identifiants directs et une image de personne partaient donc vers un
+sous-traitant, **sans chemin de retour** : supprimer un compte pose ici un marqueur
+`deleted` et n'efface rien chez le destinataire.
+
+**Option retenue** : ne transmettre que l'identifiant **pseudonyme** de Clerk, nécessaire
+pour rattacher les événements entre eux, et la date de création, qui sert aux cohortes
+sans désigner personne. Contrepartie acceptée : on ne peut plus retrouver un utilisateur
+par son e-mail dans l'interface de l'outil.
+
+C'est le bon défaut **pour une graine** : un projet dérivé qui a besoin de ce
+rapprochement peut élargir le jeu d'attributs, et ce sera alors une décision prise,
+inscrite dans `RISKS.md` et déclarée aux personnes concernées — pas un défaut hérité.
+
+Les deux gestionnaires portaient le même bloc **dupliqué** : un seul `publicProperties`
+les sert désormais, et un test couvre les deux chemins — corriger l'un en oubliant
+l'autre aurait laissé la fuite ouverte sur le plus fréquent.
+
+---
+
 ## D-039 — Deux promesses que le code ne tenait pas
 
 **Date** : 2026-08-06

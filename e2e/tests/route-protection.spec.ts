@@ -43,6 +43,16 @@ const candidates = collectRoutes(APP_DIR).filter(
  */
 const uncovered = candidates.filter(isDynamic);
 
+/**
+ * Les **server actions** sont couvertes par le contrôle statique
+ * (`__tests__/route-protection.test.ts`), qui exige qu'elles portent leur propre
+ * autorisation, mais elles n'ont pas d'URL à interroger ici : Next les appelle
+ * par un `POST` sur la page qui les importe, avec un identifiant d'action.
+ * `toUrlPath` renvoie donc `null` pour elles — sans quoi `actions/users/get.ts`
+ * produisait `/actions/users`, une URL inexistante dont le `404` figurait parmi
+ * les statuts de refus acceptés (D-044).
+ */
+
 const protectedRoutes = candidates
   .map(toUrlPath)
   .filter((path): path is string => path !== null);
