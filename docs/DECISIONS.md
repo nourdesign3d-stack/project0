@@ -149,6 +149,39 @@ la protection de `main`.
 
 ---
 
+## D-071 — Le cache Turborepo avait atteint 43 Go
+
+**Date** : 2026-08-07
+**Contexte** : le dossier de travail pesait **53 Go**, dont **43 Go de `.turbo/cache`** —
+1731 entrées, certaines à 1,8 Go pièce. Un monorepo next-forge en pèse deux à quatre.
+
+**Cause** : les sorties de la tâche `build` déclaraient `.next/**` en n'excluant que
+`.next/cache/**`. Or Next 16 avec Turbopack écrit son cache de développement dans
+`.next/dev/` — `.next/dev/cache/turbopack/**`, des centaines de fragments. Chaque build
+archivait donc **le cache du serveur de développement** dans une nouvelle entrée. Trois
+jours de `pnpm verify` répétés ont suffi.
+
+Le contenu d'une entrée, mesuré : 719 fichiers sous `apps/app/.next/dev/server/chunks/ssr`,
+435 sous `.next/dev/static/chunks`, 217 sous `.next/dev/cache/turbopack`. Ces artefacts ne
+sont pas des sorties de build — ils ne servent qu'à la machine qui les a produits, et les
+mettre en cache partagé n'a aucun sens.
+
+`!.next/dev/**` corrige la déclaration.
+
+### Ce que ce défaut enseigne, et c'est le plus intéressant
+
+**Il figurait dans l'audit du 2026-08-07 sous `PF-1102`, classé P3, et je l'ai écarté** —
+avec 40 autres constats de faible gravité, au nom du rendement décroissant. La gravité y
+était évaluée à l'aune de la sécurité et de la correction ; **le coût d'exploitation
+n'entrait dans aucune grille**.
+
+Un défaut sans conséquence de sécurité peut coûter 43 Go et rendre une machine
+inutilisable. Écarter les P3 en bloc était une heuristique raisonnable, et elle a raté
+celui-là. La leçon n'est pas « corriger les 41 » : c'est que **la gravité et le coût sont
+deux axes**, et qu'une liste triée sur un seul en cache l'autre.
+
+---
+
 ## D-070 — La graine ne livre plus de modèle de démonstration
 
 **Date** : 2026-08-07

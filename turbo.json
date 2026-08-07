@@ -9,6 +9,7 @@
       "outputs": [
         ".next/**",
         "!.next/cache/**",
+        "!.next/dev/**",
         "**/generated/**",
         "storybook-static/**",
         ".cache/**"
