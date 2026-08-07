@@ -18,7 +18,95 @@
  */
 
 const OPERATORS = ["&&", "||", "|", ";", "\n", "&"];
-const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[\s\S]*?^\2\s*$/gm;
+
+// Un groupe `( … )` ou `{ … ; }` ouvre une nouvelle invocation. Sans cela, le
+// jeton devenait `(rm` — qui ne correspond à aucune règle. Relevé en audit le
+// 2026-08-06.
+const GROUPING = new Set(["(", ")", "{", "}"]);
+
+/**
+ * Corps d'un heredoc : c'est une donnée, pas une commande.
+ *
+ * ⚠️ La version précédente effaçait **depuis `<<'EOF'` jusqu'au terminateur**,
+ * donc aussi la fin de la ligne d'ouverture. `cat <<'EOF' && rm -rf /x`
+ * disparaissait entièrement de l'analyse alors que le shell, lui, exécute bien
+ * le `&& rm -rf`. Le garde-fou ne ratait pas la commande : il l'effaçait de sa
+ * propre vue, puis répondait « autorisé ». Pire que pas de garde-fou.
+ *
+ * Le corps ne commence qu'à la ligne suivante : la fin de la ligne d'ouverture
+ * est conservée et analysée.
+ */
+const HEREDOC = /<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?^\2[ \t]*$/gm;
+
+/** Lit jusqu'au délimiteur fermant en tenant compte de l'imbrication. */
+const readUntil = (text, from, open, close) => {
+  let depth = 1;
+  let index = from;
+
+  while (index < text.length && depth > 0) {
+    if (open && text[index] === open) {
+      depth += 1;
+    } else if (text[index] === close) {
+      depth -= 1;
+    }
+    index += 1;
+  }
+
+  return { content: text.slice(from, index - 1), next: index };
+};
+
+const SUBSTITUTION = /\$\(([\s\S]*?)\)|`([\s\S]*?)`/g;
+const SUBSTITUTION_STRIP = /\$\([\s\S]*?\)|`[\s\S]*?`/g;
+
+/**
+ * Lit un segment cité ou une substitution de commande. Renvoie `null` si le
+ * caractère courant n'ouvre rien de particulier.
+ *
+ * Les substitutions sont mises de côté pour être analysées séparément : leur
+ * contenu est du code, pas du texte.
+ */
+const readSegment = (source, index, subshells) => {
+  const char = source[index];
+
+  if (char === "'") {
+    const { content, next } = readUntil(source, index + 1, null, "'");
+
+    return { text: content, next, quotes: true };
+  }
+
+  if (char === '"') {
+    const { content, next } = readUntil(source, index + 1, null, '"');
+
+    // Une substitution de commande reste active entre guillemets doubles.
+    for (const match of content.matchAll(SUBSTITUTION)) {
+      subshells.push(match[1] ?? match[2]);
+    }
+
+    return {
+      text: content.replace(SUBSTITUTION_STRIP, " "),
+      next,
+      quotes: true,
+    };
+  }
+
+  if (char === "`") {
+    const { content, next } = readUntil(source, index + 1, null, "`");
+
+    subshells.push(content);
+
+    return { text: "", next, quotes: false };
+  }
+
+  if (char === "$" && source[index + 1] === "(") {
+    const { content, next } = readUntil(source, index + 2, "(", ")");
+
+    subshells.push(content);
+
+    return { text: "", next, quotes: false };
+  }
+
+  return null;
+};
 
 /**
  * Découpe une ligne en invocations. Chaque invocation est une liste de jetons
@@ -27,7 +115,7 @@ const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[\s\S]*?^\2\s*$/gm;
  */
 export const parseCommand = (input) => {
   // Le corps d'un heredoc est une donnée, pas une commande.
-  const source = input.replace(HEREDOC, " ");
+  const source = input.replace(HEREDOC, (_match, _quote, _tag, rest) => rest);
 
   const invocations = [];
   const subshells = [];
@@ -54,59 +142,20 @@ export const parseCommand = (input) => {
     }
   };
 
-  /** Lit jusqu'au délimiteur fermant en tenant compte de l'imbrication. */
-  const readUntil = (text, from, open, close) => {
-    let depth = 1;
-    let index = from;
-
-    while (index < text.length && depth > 0) {
-      if (open && text[index] === open) {
-        depth += 1;
-      } else if (text[index] === close) {
-        depth -= 1;
-      }
-      index += 1;
-    }
-
-    return { content: text.slice(from, index - 1), next: index };
-  };
-
   for (let i = 0; i < source.length; ) {
     const char = source[i];
 
-    if (char === "'") {
-      const { content, next } = readUntil(source, i + 1, null, "'");
-      current += content;
-      quoted = true;
-      started = true;
-      i = next;
-      continue;
-    }
+    const segment = readSegment(source, i, subshells);
 
-    if (char === '"') {
-      const { content, next } = readUntil(source, i + 1, null, '"');
-      // Une substitution de commande reste active entre guillemets doubles.
-      for (const match of content.matchAll(/\$\(([\s\S]*?)\)|`([\s\S]*?)`/g)) {
-        subshells.push(match[1] ?? match[2]);
+    if (segment) {
+      current += segment.text;
+
+      if (segment.quotes) {
+        quoted = true;
+        started = true;
       }
-      current += content.replace(/\$\([\s\S]*?\)|`[\s\S]*?`/g, " ");
-      quoted = true;
-      started = true;
-      i = next;
-      continue;
-    }
 
-    if (char === "`") {
-      const { content, next } = readUntil(source, i + 1, null, "`");
-      subshells.push(content);
-      i = next;
-      continue;
-    }
-
-    if (char === "$" && source[i + 1] === "(") {
-      const { content, next } = readUntil(source, i + 2, "(", ")");
-      subshells.push(content);
-      i = next;
+      i = segment.next;
       continue;
     }
 
@@ -115,6 +164,12 @@ export const parseCommand = (input) => {
     if (operator) {
       pushInvocation();
       i += operator.length;
+      continue;
+    }
+
+    if (GROUPING.has(char)) {
+      pushInvocation();
+      i += 1;
       continue;
     }
 

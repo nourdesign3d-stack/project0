@@ -32,7 +32,8 @@
  * sortie 0 = laisser passer.
  */
 
-import { isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { parseCommand, resolveInvocation } from "./lib/shell-tokens.mjs";
 
 const SECRET_PATHS = [
@@ -60,6 +61,7 @@ const READERS = new Set([
   "cut",
   "dd",
   "diff",
+  "ditto",
   "dotenv",
   "egrep",
   "emacs",
@@ -68,9 +70,12 @@ const READERS = new Set([
   "grep",
   "gzip",
   "head",
+  "hexdump",
   "jq",
   "less",
   "ln",
+  "md5",
+  "md5sum",
   "more",
   "mv",
   "nano",
@@ -78,24 +83,32 @@ const READERS = new Set([
   "node",
   "od",
   "open",
+  "openssl",
   "paste",
   "pbcopy",
   "perl",
+  "plutil",
   "python",
   "python3",
+  "rev",
   "rg",
   "rsync",
   "ruby",
   "scp",
   "sed",
+  "sha1sum",
+  "sha256sum",
+  "shasum",
   "sort",
   "source",
+  "split",
   "strings",
   "tail",
   "tar",
   "tee",
   "tr",
   "uniq",
+  "uuencode",
   "vi",
   "vim",
   "xxd",
@@ -112,20 +125,39 @@ const INTERPRETERS = new Set(["node", "python", "python3", "perl", "ruby"]);
 const SECRET_MENTION =
   /\.env(\.local|\.production|\.development|\.test)?(?![\w.-])|\.ssh\/|id_rsa|\.aws\/(credentials|config)|\.(pem|p12|keystore)(?![\w.-])/;
 
-/** `has(args, …)` : le mot figure-t-il parmi les arguments non quotés ? */
+const CONTAINS_WHITESPACE = /\s/;
+
+/**
+ * Un jeton compte-t-il comme un argument de commande ?
+ *
+ * ⚠️ La version précédente écartait **tout** jeton entre guillemets, pour éviter
+ * qu'un message de commit parlant de `rm -rf` ne déclenche une règle. Effet de
+ * bord découvert en audit le 2026-08-06 : `rm "-rf" /chemin`, `git "push"
+ * "--force"` et `docker compose down "-v"` passaient tous. Des guillemets
+ * suffisaient à désarmer l'intégralité des règles.
+ *
+ * Le bon critère n'est pas la présence de guillemets mais **l'espacement** : un
+ * argument réel — un drapeau, une sous-commande — ne contient pas d'espace,
+ * alors qu'une phrase en contient toujours. `"-rf"` compte ; `"docs: git push
+ * --force"` reste un seul jeton porteur d'espaces, donc du texte.
+ */
+const significant = (token) =>
+  !(token.quoted && CONTAINS_WHITESPACE.test(token.value));
+
+/** `has(args, …)` : le mot figure-t-il parmi les arguments réels ? */
 const has = (args, ...words) =>
-  args.some((token) => !token.quoted && words.includes(token.value));
+  args.some((token) => significant(token) && words.includes(token.value));
 
 const startsWith = (args, word) =>
   args.some(
     (token, index) =>
-      !token.quoted &&
+      significant(token) &&
       token.value === word &&
       args.slice(0, index).every((previous) => previous.value.startsWith("-"))
   );
 
 const hasFlag = (args, test) =>
-  args.some((token) => !token.quoted && test(token.value));
+  args.some((token) => significant(token) && test(token.value));
 
 /**
  * Règles destructives. `check(args)` ne regarde que les arguments : le contenu
@@ -198,6 +230,17 @@ const DESTRUCTIVE = [
     why: "formatage de système de fichiers",
   },
   {
+    // Effacement irrécupérable : aucune corbeille, aucune restauration.
+    command: "shred",
+    check: () => true,
+    why: "effacement irréversible du contenu d'un fichier",
+  },
+  {
+    command: "truncate",
+    check: (args) => hasFlag(args, (value) => value.startsWith("-s")),
+    why: "vidage d'un fichier",
+  },
+  {
     command: "dd",
     check: (args) => hasFlag(args, (v) => v.startsWith("if=")),
     why: "écriture disque de bas niveau",
@@ -261,14 +304,31 @@ const isSecretPath = (value) => {
   return SECRET_PATHS.some((pattern) => pattern.test(candidate));
 };
 
-/** Tous les chemins absolus visés sont-ils dans un dossier temporaire ? */
+/**
+ * Tous les chemins visés sont-ils dans un dossier temporaire ?
+ *
+ * ⚠️ La version précédente ne retenait que les chemins **absolus**. Dans
+ * `rm -rf /tmp/keep ~/Documents`, `~/Documents` n'étant pas absolu, il ne restait
+ * que `/tmp/keep` : « tout est temporaire », règle sautée. Même effet avec un
+ * chemin relatif ou un motif — mesuré en audit le 2026-08-06.
+ *
+ * Désormais **chaque** argument qui n'est pas un drapeau compte, après expansion
+ * du `~` et résolution depuis le dossier courant. Un seul chemin hors du bac à
+ * sable suffit à faire appliquer la règle.
+ */
+const expandHome = (value) =>
+  value === "~" || value.startsWith("~/")
+    ? join(homedir(), value.slice(1))
+    : value;
+
 const onlyTemporaryPaths = (args) => {
   const paths = args
     .map((token) => token.value)
-    .filter((value) => isAbsolute(value));
+    .filter((value) => !value.startsWith("-"));
 
   return (
-    paths.length > 0 && paths.every((path) => TEMPORARY.test(resolve(path)))
+    paths.length > 0 &&
+    paths.every((path) => TEMPORARY.test(resolve(expandHome(path))))
   );
 };
 
