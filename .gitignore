@@ -60,7 +60,13 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
-.env*.local
+# Toute variante est ignorée — `.env.staging`, `.env.preview`, `.env.ci`… — et
+# seul l'exemple est versionné. Énumérer les suffixes laissait passer tout nom
+# non anticipé : relevé en audit le 2026-08-06 (D-038).
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 # vercel
 .vercel

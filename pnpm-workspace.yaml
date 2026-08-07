@@ -4,6 +4,11 @@ packages: # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pn
 
 # Versions imposées à tout l'arbre, dépendances transitives comprises.
 # pnpm 10 lit ce réglage ici, pas dans le champ `overrides` de package.json.
+# ⚠️ Un `overrides` placé dans package.json est **silencieusement ignoré**. Le
+# dépôt en portait un sur `parse5` : deux versions coexistaient malgré lui, ce
+# qu'un override effectif interdit. Retiré le 2026-08-06 plutôt que déplacé —
+# `parse5` ne figure dans aucune alerte, et forcer une version sans besoin mesuré
+# est une contrainte gratuite. Relevé en audit (D-038).
 overrides:
   # `@react-email/ui` dépend de next 16.2.6, sous le seuil de correction 16.2.11 :
   # il réintroduisait 9 alertes de vulnérabilité, dont 4 de sévérité haute, alors

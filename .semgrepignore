@@ -13,7 +13,6 @@ coverage/
 packages/database/generated/
 
 # Types générés par le CMS.
-packages/cms/basehub-types.d.ts
 
 # Les composants shadcn/ui NE sont PAS exclus : ils sont compilés et livrés aux
 # utilisateurs, donc analysés comme le reste. Mesuré le 2026-08-05 : 0 constat
