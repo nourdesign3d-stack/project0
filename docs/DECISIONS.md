@@ -149,6 +149,42 @@ la protection de `main`.
 
 ---
 
+## D-061 — Il n'y a pas un RPO, il y en a deux
+
+**Date** : 2026-08-07
+**Contexte** : D-059 arrêtait « RPO 1 h au premier client » et affirmait que « c'est la
+rétention d'historique du plan qui fixe le RPO ». **Ce raccourci est faux**, et il a
+produit un effet concret : le propriétaire, cherchant à s'aligner sur la politique, a
+d'abord **réduit** la rétention de 6 h à 1 h — c'est-à-dire réduit sa marge de sécurité en
+croyant l'ajuster.
+
+La rétention d'historique n'est pas le RPO. C'est la profondeur à laquelle on peut
+remonter le temps, donc une **fenêtre de détection**. Deux scénarios, deux chiffres :
+
+| Scénario | Ce qui sauve | Perte réelle |
+| --- | --- | --- |
+| Erreur logique (suppression, migration ratée) | historique PITR | **quasi nulle**, si détectée dans la fenêtre |
+| Perte du compte (suspension, facturation, compromission) | sauvegarde **hors hébergeur** | **intervalle entre deux sauvegardes** |
+
+Avec 6 heures de fenêtre, une migration destructrice passée à 14 h 00 se rattrape jusqu'à
+20 h 00 et ne coûte presque rien. Passé ce délai, on retombe sur le second scénario.
+
+**Conséquence pratique** : le seul levier sur le second scénario est la **fréquence de
+sauvegarde**, et il ne dépend d'aucun plan payant. Retenu : 1 par jour aujourd'hui,
+1 toutes les 6 heures au premier client — même coût, exposition ramenée de 24 h à 6 h.
+
+**Mesure** : `History retention` = 6 h sur le projet Neon en service, maximum de l'offre
+gratuite. Aucune raison de descendre en dessous, l'historique pesant 6,45 Mo.
+
+**Ce que ce cas enseigne**, et qui vaut au-delà des sauvegardes : une simplification écrite
+dans un document de référence ne reste pas une simplification. Elle est appliquée. Celle-ci
+a fait *baisser* une protection — un raccourci pédagogique s'est transformé en instruction,
+et l'instruction était mauvaise. C'est la même famille que tout ce que ce dépôt corrige
+depuis trois jours, à ceci près que l'affirmation fausse était **la mienne**, écrite la
+veille.
+
+---
+
 ## D-060 — Chaque risque porte désormais un déclencheur de réexamen
 
 **Date** : 2026-08-07
