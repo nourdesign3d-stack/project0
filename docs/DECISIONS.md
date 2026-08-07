@@ -111,6 +111,47 @@ seul outil de graphe.
 
 ---
 
+## D-042 — Le premier geste prescrit au repreneur ne fonctionnait pas
+
+**Date** : 2026-08-07
+**Contexte** : le bloc « Démarrer » du README prescrivait
+`cp apps/app/.env.example apps/app/.env.local` — alors que **le README lui-même**
+expliquait deux lignes plus bas qu'une variable optionnelle laissée à `""` échoue la
+validation Zod. Il omettait aussi la génération du client Prisma, que `pnpm install`
+ne déclenche pas.
+
+Un dépôt destiné à être **cloné** ne peut pas se permettre cela : c'est la première
+chose que fait celui qui arrive, et l'erreur obtenue ne désigne pas sa cause.
+
+**Mesuré sur un clone vierge**, pas déduit. Après `git clone` puis `pnpm install` :
+
+```
+app/(authenticated)/page.tsx(51,23): error TS7006: Parameter 'page' implicitly has an 'any' type.
+app/(authenticated)/search/page.tsx(59,23): error TS7006: …
+../../packages/database/index.ts(4,30): error TS2307: Cannot find module './generated/client'
+../../packages/database/index.ts(32,15): error TS2307: Cannot find module './generated/client'
+```
+
+Après `pnpm --filter @repo/database run build` : typecheck propre, sans autre
+changement.
+
+**Ce qui est corrigé.** Le bloc prescrit désormais `pnpm env:setup` — qui commente les
+valeurs vides et renseigne `DATABASE_URL` — la génération du client Prisma, et
+`pnpm migrate`. Chaque étape non évidente est justifiée à côté de la commande, parce
+qu'une recette sans raison se fait contourner à la première contrariété.
+`pnpm hooks:install` sort du bloc : il tourne déjà à l'installation.
+
+Corrigé au passage : `setup-env.mjs` citait **BaseHub** parmi les services à
+configurer, retiré depuis (D-031).
+
+**Rendu exécutoire.** `apps/api/__tests__/onboarding.test.ts` lit le bloc « Démarrer »
+du vrai README et exige qu'il prescrive `env:setup` et la génération Prisma, et qu'il
+ne prescrive **pas** de copie d'un `.env.example`. Vu échouer sur le README d'avant
+(`2 failed | 1 passed`). Le test ne rejoue pas l'installation — trop lente pour la
+chaîne courante ; il garde ce qui a été prouvé une fois.
+
+---
+
 ## D-041 — La libération d'une réservation avalait toute erreur
 
 **Date** : 2026-08-07
