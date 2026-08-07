@@ -416,9 +416,12 @@ if (
 }
 
 // Une base fraîche est vide : sans cette étape, le premier utilisateur qui
-// franchit l'authentification tombe sur une erreur serveur, la page d'accueil
-// authentifiée interrogeant `Page`. Constaté en exécutant le parcours pour de
-// vrai le 2026-08-05 — invisible tant que personne ne passait `/sign-in`.
+// franchit l'authentification tombait sur une erreur serveur, la page d'accueil
+// authentifiée interrogeant alors le modèle de démonstration. Constaté en
+// exécutant le parcours pour de vrai le 2026-08-05 — invisible tant que
+// personne ne passait `/sign-in`. Ce modèle a été retiré depuis (D-070), mais
+// la migration reste nécessaire : `WebhookEvent` doit exister avant le premier
+// webhook reçu.
 // `migrate dev` applique la migration initiale versionnée ; il n'en crée une
 // nouvelle que si le schéma a déjà été modifié.
 if (
@@ -554,8 +557,10 @@ say(`
        câblés et inertes ; chacun gardé est une surface d'attaque et un
        coût. (risque R-009)
 
-    2. Remplacer le stub Prisma \`Page\` par le premier vrai modèle,
-       puis : pnpm migrate --name <nom>
+    2. Écrire le premier modèle Prisma du produit, puis :
+       pnpm migrate --name <nom>. Toute donnée scopée à une organisation
+       doit porter son filtre dans le \`where\` — la règle Semgrep
+       local-tenant-filter-required le refuse sinon.
 
     3. Remplir docs/PROJECT_CONTEXT.md et docs/DOMAIN_MODEL.md —
        sans rien inventer. Une supposition va dans ASSUMPTIONS.md.

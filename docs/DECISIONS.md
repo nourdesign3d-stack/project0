@@ -194,6 +194,18 @@ des documents remis à zéro. Vérifié, pas supposé.
 un clone initialisé. C'est la seule vérification qui exerce l'état que reçoivent réellement
 ses utilisateurs.
 
+**Deuxième défaut trouvé par le même usage**, dans la minute qui a suivi : le message final
+de `vibe0` prescrivait « remplacer le stub Prisma `Page` par le premier vrai modèle ».
+`Page` avait été supprimé la veille (D-070). Le repreneur recevait donc, en dernier mot de
+son amorçage, une instruction portant sur un modèle inexistant. `project-init.mjs` portait
+la même. Les deux sont corrigées, et la nouvelle formulation rappelle l'exigence de filtre
+de locataire (D-069) — c'est le bon endroit pour la dire, au moment où le premier modèle
+va être écrit.
+
+Ces deux défauts partagent une cause : **ce que la graine dit à ses utilisateurs n'est
+exercé par aucun test**. Les squelettes et les messages d'amorçage sont du texte que seul
+un usage réel lit.
+
 ---
 
 ## D-071 — Le cache Turborepo avait atteint 43 Go

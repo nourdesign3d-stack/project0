@@ -268,7 +268,7 @@ out.write(`
 
     6. Décisions de fond, à ne pas repousser :
          - quelles intégrations supprimer (services câblés mais inertes, R-009) ;
-         - remplacer le stub Prisma \`Page\` par le vrai modèle ;
+         - écrire le premier modèle Prisma du produit ;
          - remplir docs/PROJECT_CONTEXT.md et docs/DOMAIN_MODEL.md sans inventer ;
          - relire ARCHITECTURE, SECURITY_MODEL, QUALITY_GATES et DEPLOYMENT :
            ils décrivent le squelette, pas encore votre produit.
