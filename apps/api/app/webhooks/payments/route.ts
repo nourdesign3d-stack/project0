@@ -4,10 +4,12 @@ import { parseError } from "@repo/observability/error";
 import { log } from "@repo/observability/log";
 import type { Stripe } from "@repo/payments";
 import { stripe } from "@repo/payments";
+// biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
+import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { env } from "@/env";
-import { claimEvent, releaseEvent } from "@/lib/idempotency";
+import { claimEvent, completeEvent, releaseEvent } from "@/lib/idempotency";
 
 const PROVIDER = "stripe";
 
@@ -138,7 +140,13 @@ export const POST = async (request: Request): Promise<Response> => {
   } catch (error) {
     // 4xx et non 5xx : Stripe réessaie sur 5xx, or une signature invalide ne
     // deviendra jamais valide. Journaliser la forme, jamais le corps reçu.
-    log.error(`webhook Stripe : signature refusée — ${parseError(error)}`);
+    //
+    // `expected` : un refus de signature n'est pas un incident. Le remonter à
+    // Sentry offrait à tout appelant anonyme le moyen de noyer les vraies
+    // erreurs sous du bruit qu'il contrôle (D-052).
+    log.error(
+      `webhook Stripe : signature refusée — ${parseError(error, { expected: true })}`
+    );
 
     return NextResponse.json({ ok: false }, { status: 400 });
   }
@@ -156,6 +164,15 @@ export const POST = async (request: Request): Promise<Response> => {
 
     return NextResponse.json({ ok: false }, { status: 503 });
   }
+
+  // Identifiant de corrélation : l'identifiant d'événement du fournisseur est
+  // posé sur la trace Sentry. Sentry est bridé — ni corps, ni en-têtes, ni
+  // variables locales (R-018) — et sans ce point commun, un incident vu dans
+  // Sentry ne peut être rapproché ni du journal ni de l'événement chez Stripe.
+  // C'est la compensation que `.claude/rules/security.md` exige de chaque
+  // frontière serveur, et qu'aucune n'appliquait (D-052).
+  Sentry.setTag("webhook.provider", PROVIDER);
+  Sentry.setTag("webhook.event_id", event.id);
 
   if (!claimed) {
     log.info(`webhook Stripe : événement déjà traité — ${event.id}`);
@@ -179,6 +196,11 @@ export const POST = async (request: Request): Promise<Response> => {
     }
 
     await analytics?.shutdown();
+
+    // Marquer **abouti**. Sans cela, la réservation reste indistinguable d'un
+    // traitement interrompu et sera reprise après le délai de péremption : le
+    // même événement serait traité deux fois (D-049).
+    await completeEvent(PROVIDER, event.id);
 
     // Réponse minimale : elle part vers un tiers. La version précédente y
     // renvoyait l'événement entier — identité du client, montant, adresse.

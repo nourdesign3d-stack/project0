@@ -7,11 +7,13 @@ import type {
   WebhookEvent,
 } from "@repo/auth/server";
 import { log } from "@repo/observability/log";
+// biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
+import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { env } from "@/env";
-import { claimEvent, releaseEvent } from "@/lib/idempotency";
+import { claimEvent, completeEvent, releaseEvent } from "@/lib/idempotency";
 
 const PROVIDER = "clerk";
 
@@ -219,6 +221,14 @@ export const POST = async (request: Request): Promise<Response> => {
   // un service tiers (BetterStack). Voir .claude/rules/security.md.
   log.info("Webhook", { id, eventType });
 
+  // Identifiant de corrélation, posé sur la trace Sentry. Sentry est bridé — ni
+  // corps, ni en-têtes, ni variables locales (R-018) : sans ce point commun, un
+  // incident vu dans Sentry ne peut être rapproché ni du journal ni de la
+  // livraison chez le fournisseur. La clé est `svix-id`, identifiant de
+  // **livraison**, celui que porte aussi le tableau de bord Svix (D-052).
+  Sentry.setTag("webhook.provider", PROVIDER);
+  Sentry.setTag("webhook.event_id", svixId);
+
   // Réserver avant de traiter (R-012). La clé est `svix-id`, identifiant de
   // **livraison** : Svix conserve le même d'un réessai à l'autre, alors que
   // l'identifiant de la ressource (`event.data.id`) est partagé par tous les
@@ -278,6 +288,10 @@ export const POST = async (request: Request): Promise<Response> => {
     }
 
     await analytics?.shutdown();
+
+    // Marquer **abouti** : une réservation non terminée est reprise après le
+    // délai de péremption, et l'événement serait traité deux fois (D-049).
+    await completeEvent(PROVIDER, svixId);
   } catch (error) {
     // Libérer, sinon le réessai de Clerk serait pris pour un doublon et
     // l'événement serait perdu en silence.
