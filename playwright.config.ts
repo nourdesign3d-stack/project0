@@ -27,8 +27,15 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
-  // Artefacts de diagnostic uniquement en cas d'échec.
-  // Ne jamais y inclure de secret : ni dans les URL, ni dans les champs saisis.
+  /*
+   * Artefacts de diagnostic, uniquement en cas d'échec.
+   *
+   * ⚠️ Une trace contient les en-têtes **et les corps** des requêtes. Elle ne
+   * peut donc pas être rendue sûre par convention : tout parcours qui manipule
+   * des identifiants doit les **désactiver localement**, avec
+   * `test.use({ trace: "off", video: "off", screenshot: "off" })`.
+   * C'est fait dans `e2e/tests/access-control.spec.ts`. Voir D-037.
+   */
   reporter: process.env.CI
     ? [["html", { open: "never" }], ["github"]]
     : [["list"]],

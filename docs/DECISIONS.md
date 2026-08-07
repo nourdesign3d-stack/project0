@@ -111,6 +111,39 @@ seul outil de graphe.
 
 ---
 
+## D-037 — Aucun artefact pour les parcours qui manipulent des identifiants
+
+**Date** : 2026-08-06
+**Contexte** : `ci.yml` portait ce commentaire — « les rapports peuvent contenir des
+captures d'écran : ne jamais y laisser de secret ». Il anticipait les captures et
+sous-estimait tout le reste.
+
+Une **trace** Playwright enregistre les en-têtes **et les corps** des requêtes. Le parcours
+authentifié y laisse donc le `POST` de connexion Clerk — avec le mot de passe du compte de
+test, qui est un secret de dépôt — et le `Set-Cookie` de session. La **vidéo** et les
+**captures** montrent le code de vérification, saisi dans un champ texte ordinaire, pas un
+champ masqué.
+
+Ces artefacts sont téléversés à chaque exécution, et **GitHub ne caviarde jamais le contenu
+d'un artefact** : il ne masque que les journaux. Tout collaborateur du dépôt pouvait les
+télécharger, sept jours durant.
+
+**Décision** : couper trace, vidéo et captures **pour ce seul parcours**, avec
+`test.use({ trace: "off", video: "off", screenshot: "off" })`.
+
+Le choix est délibérément chirurgical. Tout désactiver en CI aurait coûté cher : c'est
+précisément le rapport Playwright qui a permis de diagnostiquer, la veille, la
+configuration Clerk divergente et le faux positif du contrôle de refus. Les parcours
+anonymes n'émettent aucun identifiant et gardent donc leur valeur de diagnostic.
+
+**Une convention ne tient pas.** Celui qui ajoutera le prochain parcours authentifié ne
+lira pas le commentaire de `ci.yml`. `apps/api/__tests__/e2e-artifacts.test.ts` rend la
+règle exécutoire : toute spec qui lit `E2E_USER_PASSWORD` ou `E2E_USER_OTP` doit désactiver
+les trois artefacts. Vu échouer après retrait de la directive.
+
+**Ce qui reste vrai** : la rétention est de sept jours, le dépôt est privé, et le compte est
+dédié aux tests. Le périmètre était borné — mais `CLERK_SECRET_KEY` transite dans le même
+job, et un mot de passe de compte de test reste un secret de dépôt.
 ## D-036 — Le garde-fou Bash réparé : six défauts, aucun n'exigeait d'obscurcissement
 
 **Date** : 2026-08-06
