@@ -19,7 +19,7 @@ setup (pnpm + cache) → prisma generate → lint → typecheck → test
 - Actions tierces épinglées au **SHA de commit**, version en commentaire (D-009).
 - **Aucun `|| true`**, aucune étape masquant un échec. Une étape non bloquante doit être
   nommée `(informatif)` et justifiée dans ce fichier.
-- Le build est **complet** depuis le retrait de BaseHub (D-031) : aucune application ne
+- Le build est **complet** (D-031) : aucune application ne
   dépend d'un jeton de service pour se construire. Seul le job E2E Playwright reste
   conditionnel (`ENABLE_E2E`), faute de pouvoir versionner des identifiants de test.
 

@@ -38,7 +38,7 @@
     "translate": "turbo translate",
     "typecheck": "turbo typecheck && pnpm typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build --filter=app... --filter=api... --filter=email...",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build",
     "vibe0": "node scripts/vibe0.mjs",
     "vibe0:install": "node bin/install-vibe0.mjs"
   },
