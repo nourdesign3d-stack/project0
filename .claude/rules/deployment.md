@@ -11,7 +11,8 @@ Chaîne exécutée sur `push` et `pull_request` :
 
 ```
 setup (pnpm + cache) → prisma generate → lint → typecheck → test
-  → test:hooks → test:scripts → test:launcher → boundaries → build (complet) → semgrep
+  → test:hooks → test:scripts → test:launcher → manifest:check → boundaries
+  → build (complet) → semgrep
 ```
 
 - Les jobs utilisent `pnpm install --frozen-lockfile` : le lockfile fait foi.

@@ -149,6 +149,61 @@ la protection de `main`.
 
 ---
 
+## D-074 — Le dépôt émet un manifeste, et il ne peut pas mentir
+
+**Date** : 2026-08-07
+**Contexte** : le propriétaire dispose d'un plan de pilotage — connecteurs, moteur de
+décision, scanners normalisés, suivi des failles, double approbation, retour arrière —
+en service, avec 21 versions traitées. Il ne voit pourtant pas ses applications, pour une
+raison simple : **la graine n'émettait rien**.
+
+C'est le §13 du brief de plateforme, et c'était le seul chaînon absent entre ce qui
+existe et ce que le tableau de bord doit montrer : quelle capacité est branchée, laquelle
+est désactivée, laquelle est en construction, dans quelle version, laquelle porte des
+failles.
+
+### Calculé, jamais rédigé — et c'est toute la décision
+
+Un manifeste écrit à la main serait faux en quarante-huit heures. Ce dépôt en a la preuve
+deux fois : quatorze affirmations documentaires fausses en deux jours (D-057), sept règles
+périmées trouvées par un agent au travail (D-073). Et **un manifeste faux est pire qu'un
+document faux** : on le regarde dans un cockpit, donc on s'y fie.
+
+| | Source | Ce qu'il porte |
+| --- | --- | --- |
+| **Déclaré** | clé `capability` du `package.json` de chaque package | identité et fournisseur — ce qui ne se devine pas |
+| **Dérivé** | `package.json`, `keys.ts`, graphe d'imports | versions, variables exigées, consommateurs, **et le statut** |
+
+**Le statut est dérivé, et c'est le point important.** Un package que personne n'importe
+est marqué `unused`, quoi qu'en dise son auteur. Seul `building` est déclarable, parce
+qu'une intention en cours ne se devine pas — et un test refuse toute autre déclaration.
+
+Le manifeste a immédiatement dit une vérité que personne n'avait écrite : **`ai` et
+`storage` sont inutilisés**. C'était vrai depuis des semaines.
+
+### Ce que le dépôt ne peut pas savoir
+
+Si une capacité est **réellement branchée** dépend de l'environnement, pas du code. C'est
+`/manifest` (`apps/api`) qui le dit, pour l'environnement où il tourne.
+
+⚠️ Il ne renvoie **que des booléens de présence**, jamais une valeur — et les noms des
+variables manquantes, qui disent quoi renseigner. Une variable vide compte comme absente,
+puisqu'une valeur `""` échoue la validation Zod. Sans `MANIFEST_TOKEN` : `503`, refus par
+défaut — savoir quels services **ne sont pas** configurés renseigne un attaquant sur où
+chercher.
+
+### Ce que ce lot n'est pas
+
+**Ce ne sont pas des ports et adaptateurs.** Le brief les prévoit (§2, §6) ; ils restent
+prématurés tant qu'il n'y a qu'une application. Un manifeste décrit ce qui existe, il
+n'abstrait rien.
+
+**Le contrat appartient au consommateur.** `schemaVersion: 1` est une proposition de la
+graine, pas une norme : le plan de pilotage définira la forme définitive, et c'est à lui
+de le faire.
+
+---
+
 ## D-073 — Sept affirmations périmées, trouvées par l'agent d'un projet dérivé
 
 **Date** : 2026-08-07

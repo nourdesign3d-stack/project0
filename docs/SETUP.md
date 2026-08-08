@@ -84,6 +84,7 @@ environnement**.
 | --- | --- | --- |
 | `FLAGS_SECRET` | protège la découverte des feature flags | `openssl rand -base64 32` |
 | `CRON_SECRET` | seule protection des tâches planifiées, publiquement joignables | `openssl rand -base64 32` |
+| `MANIFEST_TOKEN` | protège `/manifest`, qui dit **quels services sont branchés** dans cet environnement | `openssl rand -base64 32` |
 
 Sans `CRON_SECRET`, `/cron/keep-alive` et `/cron/purge-webhook-events` répondent `503` —
 refus par défaut, pas de dégradation silencieuse.
@@ -104,6 +105,27 @@ refus par défaut, pas de dégradation silencieuse.
 ⚠️ `NEXT_PUBLIC_POSTHOG_HOST` doit pointer sur **votre** domaine suivi de `/ingest`, pas sur
 `*.i.posthog.com`. Le proxy existe parce qu'un appel direct est bloqué par la plupart des
 bloqueurs de publicité — la mesure devient alors partielle sans que rien ne le signale.
+
+### Le manifeste — ce que le dépôt expose à un plan de pilotage
+
+```bash
+pnpm manifest         # régénère manifest.json
+pnpm manifest:check   # échoue s'il n'est plus à jour (dans pnpm verify)
+```
+
+`manifest.json` décrit la **composition** : chaque capacité, son fournisseur, sa
+criticité, ses versions, les variables qu'elle exige, et **qui l'importe réellement**.
+
+Il est **calculé, jamais rédigé**. Ce qui ne se devine pas — identité et fournisseur —
+est déclaré dans le `package.json` de chaque package, sous la clé `capability`. Tout le
+reste est dérivé, **y compris le statut** : un package que personne n'importe est marqué
+`unused`, quoi qu'en dise son auteur. Seul `building` est déclarable, parce qu'une
+intention ne se devine pas.
+
+⚠️ Le manifeste ne dit **pas** si une capacité est branchée : cela dépend de
+l'environnement, pas du dépôt. C'est la route `/manifest` de `apps/api` qui le dit, pour
+l'environnement où elle tourne, et elle ne renvoie **que des booléens de présence** —
+jamais une valeur. Sans `MANIFEST_TOKEN`, elle répond `503`.
 
 ---
 

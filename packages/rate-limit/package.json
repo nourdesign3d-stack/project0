@@ -15,5 +15,10 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "typescript": "^5.9.3"
+  },
+  "capability": {
+    "id": "rate-limit",
+    "provider": "Upstash",
+    "criticality": "high"
   }
 }
