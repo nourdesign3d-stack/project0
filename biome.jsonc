@@ -38,6 +38,12 @@
       "!packages/design-system/lib",
       "!packages/design-system/hooks",
       "!packages/collaboration/config.ts",
+      // Artefacts du manifeste, réécrits par `pnpm manifest`. Les formater à la
+      // main créerait une boucle : le générateur les réécrirait au prochain
+      // passage, et `manifest:check` échouerait sur une différence de style.
+      // Leur exactitude est garantie par ce contrôle, pas par le formateur.
+      "!manifest.json",
+      "!apps/api/app/manifest/capabilities.generated.ts",
       "!docs",
       "!apps/docs/**/*.json",
       "!apps/email/.react-email"

@@ -13,5 +13,10 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*"
+  },
+  "capability": {
+    "id": "storage",
+    "provider": "Vercel Blob",
+    "criticality": "low"
   }
 }

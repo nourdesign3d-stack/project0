@@ -25,6 +25,8 @@
     "graph": "mkdir -p docs/graph && depcruise apps packages --output-type mermaid --output-to docs/graph/dependencies.mmd && depcruise apps packages --output-type err-long",
     "hooks:install": "node scripts/install-hooks.mjs",
     "lint": "ultracite check",
+    "manifest": "node scripts/manifest.mjs",
+    "manifest:check": "node scripts/manifest.mjs --check",
     "migrate": "cd packages/database && pnpm exec prisma format && pnpm exec prisma generate && pnpm exec prisma migrate dev",
     "migrate:deploy": "cd packages/database && pnpm exec prisma generate && pnpm exec prisma migrate deploy",
     "migrate:status": "cd packages/database && pnpm exec prisma migrate status",
@@ -38,7 +40,7 @@
     "translate": "turbo translate",
     "typecheck": "turbo typecheck && pnpm typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm boundaries && pnpm build",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm test:scripts && pnpm test:launcher && pnpm manifest:check && pnpm boundaries && pnpm build",
     "vibe0": "node scripts/vibe0.mjs",
     "vibe0:install": "node bin/install-vibe0.mjs"
   },

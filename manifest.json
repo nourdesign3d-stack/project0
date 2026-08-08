@@ -1,0 +1,881 @@
+{
+  "schemaVersion": 1,
+  "component": {
+    "name": "project0",
+    "version": "0.0.0",
+    "commit": "5b0a3b302e19ddbce3b7661dd99bcbf8a49d9fe0"
+  },
+  "capabilities": [
+    {
+      "id": "ai",
+      "package": "@repo/ai",
+      "provider": "OpenAI (AI SDK)",
+      "criticality": "low",
+      "status": "unused",
+      "providerPackages": [
+        {
+          "name": "@ai-sdk/openai",
+          "version": "^3.0.41"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "ai",
+          "version": "^6.0.116"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "streamdown",
+          "version": "^2.4.0"
+        },
+        {
+          "name": "tailwind-merge",
+          "version": "^3.5.0"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "OPENAI_API_KEY"
+      ],
+      "consumers": []
+    },
+    {
+      "id": "analytics",
+      "package": "@repo/analytics",
+      "provider": "PostHog",
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@next/third-parties",
+          "version": "16.2.12"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "@vercel/analytics",
+          "version": "^1.6.1"
+        },
+        {
+          "name": "posthog-js",
+          "version": "^1.359.1"
+        },
+        {
+          "name": "posthog-node",
+          "version": "^5.28.0"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "POSTHOG_REGION"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web",
+        "packages/feature-flags"
+      ]
+    },
+    {
+      "id": "build-config",
+      "package": "@repo/next-config",
+      "provider": null,
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@next/bundle-analyzer",
+          "version": "16.2.12"
+        },
+        {
+          "name": "@t3-oss/env-core",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "ANALYZE",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_DOCS_URL",
+        "NEXT_PUBLIC_WEB_URL",
+        "NEXT_RUNTIME",
+        "VERCEL",
+        "VERCEL_ENV",
+        "VERCEL_PROJECT_PRODUCTION_URL",
+        "VERCEL_REGION",
+        "VERCEL_URL"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web"
+      ]
+    },
+    {
+      "id": "collaboration",
+      "package": "@repo/collaboration",
+      "provider": "Liveblocks",
+      "criticality": "low",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@liveblocks/client",
+          "version": "^3.15.0"
+        },
+        {
+          "name": "@liveblocks/node",
+          "version": "^3.15.0"
+        },
+        {
+          "name": "@liveblocks/react",
+          "version": "^3.15.0"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "LIVEBLOCKS_SECRET"
+      ],
+      "consumers": [
+        "apps/app"
+      ]
+    },
+    {
+      "id": "database",
+      "package": "@repo/database",
+      "provider": "PostgreSQL",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@prisma/adapter-pg",
+          "version": "7.4.2"
+        },
+        {
+          "name": "@prisma/client",
+          "version": "7.4.2"
+        },
+        {
+          "name": "@prisma/client-runtime-utils",
+          "version": "^7.4.2"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "pg",
+          "version": "^8.22.0"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "DATABASE_URL"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app"
+      ]
+    },
+    {
+      "id": "design-system",
+      "package": "@repo/design-system",
+      "provider": null,
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@hookform/resolvers",
+          "version": "^5.2.2"
+        },
+        {
+          "name": "@radix-ui/react-icons",
+          "version": "^1.3.2"
+        },
+        {
+          "name": "class-variance-authority",
+          "version": "^0.7.1"
+        },
+        {
+          "name": "clsx",
+          "version": "^2.1.1"
+        },
+        {
+          "name": "cmdk",
+          "version": "^1.1.1"
+        },
+        {
+          "name": "date-fns",
+          "version": "^4.1.0"
+        },
+        {
+          "name": "embla-carousel-react",
+          "version": "^8.6.0"
+        },
+        {
+          "name": "geist",
+          "version": "^1.7.0"
+        },
+        {
+          "name": "input-otp",
+          "version": "^1.4.2"
+        },
+        {
+          "name": "lucide-react",
+          "version": "^0.577.0"
+        },
+        {
+          "name": "next-themes",
+          "version": "^0.4.6"
+        },
+        {
+          "name": "radix-ui",
+          "version": "latest"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "react-day-picker",
+          "version": "^9.14.0"
+        },
+        {
+          "name": "react-hook-form",
+          "version": "^7.71.2"
+        },
+        {
+          "name": "react-moveable",
+          "version": "^0.56.0"
+        },
+        {
+          "name": "react-resizable-panels",
+          "version": "^4"
+        },
+        {
+          "name": "recharts",
+          "version": "^3.8.0"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "sonner",
+          "version": "^2.0.7"
+        },
+        {
+          "name": "tailwind-merge",
+          "version": "^3.5.0"
+        },
+        {
+          "name": "tw-animate-css",
+          "version": "^1.4.0"
+        },
+        {
+          "name": "vaul",
+          "version": "^1.1.2"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/storybook",
+        "apps/web",
+        "packages/feature-flags"
+      ]
+    },
+    {
+      "id": "email",
+      "package": "@repo/email",
+      "provider": "Resend",
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@react-email/components",
+          "version": "1.0.8"
+        },
+        {
+          "name": "@react-email/render",
+          "version": "2.1.0"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "react-dom",
+          "version": "19.2.4"
+        },
+        {
+          "name": "resend",
+          "version": "^6.9.3"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "RESEND_FROM",
+        "RESEND_TOKEN"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web"
+      ]
+    },
+    {
+      "id": "feature-flags",
+      "package": "@repo/feature-flags",
+      "provider": "Vercel Flags",
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "@vercel/toolbar",
+          "version": "^0.2.2"
+        },
+        {
+          "name": "flags",
+          "version": "^4.0.3"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "FLAGS_SECRET"
+      ],
+      "consumers": [
+        "apps/app",
+        "apps/web"
+      ]
+    },
+    {
+      "id": "i18n",
+      "package": "@repo/internationalization",
+      "provider": null,
+      "criticality": "low",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@formatjs/intl-localematcher",
+          "version": "^0.8.1"
+        },
+        {
+          "name": "negotiator",
+          "version": "^1.0.0"
+        },
+        {
+          "name": "next-international",
+          "version": "^1.3.1"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        }
+      ],
+      "requiredEnv": [],
+      "consumers": [
+        "apps/web"
+      ]
+    },
+    {
+      "id": "identity",
+      "package": "@repo/auth",
+      "provider": "Clerk",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@clerk/nextjs",
+          "version": "^7.0.1"
+        },
+        {
+          "name": "@clerk/themes",
+          "version": "^2.4.57"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "next-themes",
+          "version": "^0.4.6"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "CLERK_SECRET_KEY",
+        "CLERK_WEBHOOK_SECRET",
+        "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web",
+        "packages/design-system",
+        "packages/feature-flags",
+        "packages/webhooks"
+      ]
+    },
+    {
+      "id": "notifications",
+      "package": "@repo/notifications",
+      "provider": "Knock",
+      "criticality": "low",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@knocklabs/node",
+          "version": "^1.29.1"
+        },
+        {
+          "name": "@knocklabs/react",
+          "version": "^0.11.7"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "KNOCK_SECRET_API_KEY",
+        "NEXT_PUBLIC_KNOCK_API_KEY",
+        "NEXT_PUBLIC_KNOCK_FEED_CHANNEL_ID"
+      ],
+      "consumers": [
+        "apps/app"
+      ]
+    },
+    {
+      "id": "observability",
+      "package": "@repo/observability",
+      "provider": "Sentry, BetterStack",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@logtail/next",
+          "version": "^0.3.1"
+        },
+        {
+          "name": "@sentry/nextjs",
+          "version": "^10.42.0"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "BETTERSTACK_API_KEY",
+        "BETTERSTACK_URL",
+        "BETTER_STACK_INGESTING_URL",
+        "BETTER_STACK_SOURCE_TOKEN",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT"
+      ],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web",
+        "packages/design-system"
+      ]
+    },
+    {
+      "id": "payments",
+      "package": "@repo/payments",
+      "provider": "Stripe",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "stripe",
+          "version": "^20.4.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ],
+      "consumers": [
+        "apps/api"
+      ]
+    },
+    {
+      "id": "rate-limit",
+      "package": "@repo/rate-limit",
+      "provider": "Upstash",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "@upstash/ratelimit",
+          "version": "^2.0.8"
+        },
+        {
+          "name": "@upstash/redis",
+          "version": "^1.36.3"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "UPSTASH_REDIS_REST_TOKEN",
+        "UPSTASH_REDIS_REST_URL"
+      ],
+      "consumers": [
+        "apps/web"
+      ]
+    },
+    {
+      "id": "security",
+      "package": "@repo/security",
+      "provider": "Nosecone",
+      "criticality": "high",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@nosecone/next",
+          "version": "1.2.0"
+        },
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/web"
+      ]
+    },
+    {
+      "id": "seo",
+      "package": "@repo/seo",
+      "provider": null,
+      "criticality": "low",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "lodash.merge",
+          "version": "^4.6.2"
+        },
+        {
+          "name": "react",
+          "version": "19.2.4"
+        },
+        {
+          "name": "schema-dts",
+          "version": "^1.1.5"
+        }
+      ],
+      "requiredEnv": [],
+      "consumers": [
+        "apps/app",
+        "apps/web"
+      ]
+    },
+    {
+      "id": "storage",
+      "package": "@repo/storage",
+      "provider": "Vercel Blob",
+      "criticality": "low",
+      "status": "unused",
+      "providerPackages": [
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "@vercel/blob",
+          "version": "^2.3.1"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "BLOB_READ_WRITE_TOKEN"
+      ],
+      "consumers": []
+    },
+    {
+      "id": "typescript-config",
+      "package": "@repo/typescript-config",
+      "provider": null,
+      "criticality": "low",
+      "status": "active",
+      "providerPackages": [],
+      "requiredEnv": [],
+      "consumers": [
+        "apps/api",
+        "apps/app",
+        "apps/email",
+        "apps/storybook",
+        "apps/web",
+        "packages/ai",
+        "packages/analytics",
+        "packages/auth",
+        "packages/collaboration",
+        "packages/database",
+        "packages/design-system",
+        "packages/email",
+        "packages/feature-flags",
+        "packages/internationalization",
+        "packages/next-config",
+        "packages/notifications",
+        "packages/observability",
+        "packages/payments",
+        "packages/rate-limit",
+        "packages/security",
+        "packages/seo",
+        "packages/storage",
+        "packages/webhooks"
+      ]
+    },
+    {
+      "id": "webhooks",
+      "package": "@repo/webhooks",
+      "provider": "Svix",
+      "criticality": "medium",
+      "status": "active",
+      "providerPackages": [
+        {
+          "name": "@t3-oss/env-nextjs",
+          "version": "^0.13.10"
+        },
+        {
+          "name": "server-only",
+          "version": "^0.0.1"
+        },
+        {
+          "name": "svix",
+          "version": "^1.86.0"
+        },
+        {
+          "name": "zod",
+          "version": "^4.3.6"
+        }
+      ],
+      "requiredEnv": [
+        "SVIX_TOKEN"
+      ],
+      "consumers": [
+        "apps/app"
+      ]
+    }
+  ],
+  "applications": [
+    {
+      "name": "api",
+      "version": null,
+      "capabilities": [
+        "@repo/analytics",
+        "@repo/auth",
+        "@repo/database",
+        "@repo/design-system",
+        "@repo/email",
+        "@repo/next-config",
+        "@repo/observability",
+        "@repo/payments",
+        "@repo/security"
+      ]
+    },
+    {
+      "name": "app",
+      "version": null,
+      "capabilities": [
+        "@repo/analytics",
+        "@repo/auth",
+        "@repo/collaboration",
+        "@repo/database",
+        "@repo/design-system",
+        "@repo/email",
+        "@repo/feature-flags",
+        "@repo/next-config",
+        "@repo/notifications",
+        "@repo/observability",
+        "@repo/security",
+        "@repo/seo",
+        "@repo/webhooks"
+      ]
+    },
+    {
+      "name": "docs",
+      "version": null,
+      "capabilities": []
+    },
+    {
+      "name": "email",
+      "version": "0.0.0",
+      "capabilities": [
+        "@repo/email"
+      ]
+    },
+    {
+      "name": "storybook",
+      "version": "0.1.0",
+      "capabilities": [
+        "@repo/design-system"
+      ]
+    },
+    {
+      "name": "studio",
+      "version": "0.0.0",
+      "capabilities": []
+    },
+    {
+      "name": "web",
+      "version": null,
+      "capabilities": [
+        "@repo/analytics",
+        "@repo/auth",
+        "@repo/design-system",
+        "@repo/email",
+        "@repo/feature-flags",
+        "@repo/internationalization",
+        "@repo/next-config",
+        "@repo/observability",
+        "@repo/rate-limit",
+        "@repo/security",
+        "@repo/seo"
+      ]
+    }
+  ]
+}
