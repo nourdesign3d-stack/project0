@@ -809,15 +809,32 @@ check("les squelettes ne parlent que de ce qui existe encore", () => {
     ([, name]) => name
   );
 
-  // Retiré du dépôt : plus aucun squelette ne doit y renvoyer.
-  const REMOVED = ["relationMode", "BaseHub", "basehub"];
+  // Retiré du dépôt : plus aucun texte destiné au repreneur ne doit y renvoyer.
+  //
+  // ⚠️ Comparaison **insensible à la casse** : la première version cherchait
+  // « BaseHub » et laissait passer « BASEHUB_TOKEN », que le squelette des
+  // risques contenait toujours. Trouvé par le premier agent travaillant sur un
+  // projet dérivé (D-073).
+  const REMOVED = ["relationmode", "basehub", "adapter-neon"];
 
-  for (const file of readdirSync(join(root, "docs/_skeletons"))) {
-    const content = readFileSync(join(root, "docs/_skeletons", file), "utf8");
+  // `.claude/rules/` est lu par tout agent à chaque tâche : une règle périmée y
+  // coûte plus cher qu'ailleurs, parce qu'elle est appliquée.
+  const SOURCES = [
+    ...readdirSync(join(root, "docs/_skeletons")).map((f) =>
+      join("docs/_skeletons", f)
+    ),
+    ...readdirSync(join(root, ".claude/rules")).map((f) =>
+      join(".claude/rules", f)
+    ),
+  ];
+
+  for (const file of SOURCES) {
+    const content = readFileSync(join(root, file), "utf8");
+    const lowered = content.toLowerCase();
 
     for (const term of REMOVED) {
       assert(
-        !content.includes(term),
+        !lowered.includes(term),
         `${file} mentionne « ${term} », retiré du dépôt : un projet neuf en hériterait`
       );
     }

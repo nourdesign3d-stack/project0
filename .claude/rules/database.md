@@ -7,7 +7,8 @@ globs: ["packages/database/**"]
 
 ## État réel
 
-- Prisma 7 (`packages/database`), provider `postgresql`, `relationMode = "prisma"`.
+- Prisma 7 (`packages/database`), provider `postgresql`. **Les clés étrangères sont
+  appliquées par la base** — voir D-065 pour l'historique.
 - Client généré dans `packages/database/generated` par `prisma generate`
   (`pnpm --filter @repo/database run build`).
 - Pilote Postgres standard (`@prisma/adapter-pg`) — connexion par `DATABASE_URL`, partout.
@@ -17,14 +18,13 @@ globs: ["packages/database/**"]
   vérifié le 2026-08-05 — connexion, migrations et requêtes applicatives y passent, sans
   `directUrl` (D-025). ⚠️ Une montée en `pg` 9 affaiblira `sslmode=require`, qui cessera de
   vérifier le certificat : exiger alors `verify-full` explicitement (R-021).
-- Le schéma contient un modèle de démonstration `Page`, à supprimer, et un modèle
+- Le schéma ne contient **aucun modèle de démonstration** (retiré, D-070), seulement un modèle
   d'infrastructure `WebhookEvent` (idempotence, D-023) qui ne suppose rien du produit.
   Le vrai modèle métier reste à définir (`docs/DOMAIN_MODEL.md`).
 
-⚠️ `relationMode = "prisma"` signifie que **les clés étrangères ne sont pas appliquées par
-la base**. L'intégrité référentielle repose sur l'application : chaque suppression ou
-réassociation doit être traitée explicitement, et les index sur les colonnes de relation
-sont obligatoires.
+⚠️ L'intégrité référentielle est **appliquée par PostgreSQL**. Une suppression qui
+laisserait des lignes orphelines échoue en base, comme il se doit. Les index sur les
+colonnes de relation restent obligatoires — pour les performances, plus pour la sûreté.
 
 ## Migrations
 

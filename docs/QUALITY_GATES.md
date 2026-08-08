@@ -16,7 +16,7 @@ Référence à ne jamais dégrader : `pnpm typecheck` → **0 erreur**, sur tous
 ### Prérequis, et ce que `pnpm verify` ne couvre pas
 
 `pnpm verify` enchaîne lint, typecheck, tests, tests des hooks/scripts/lanceur, frontières
-et build complet. Deux choses doivent être vraies avant qu'il ait un sens :
+et build complet — **33 s** pour ce dernier, dont l'essentiel en cache. Deux choses doivent être vraies avant qu'il ait un sens :
 
 - **le client Prisma est généré** (`pnpm --filter @repo/database run build`). Sur un clone
   neuf, `pnpm install` ne le fait pas et le typecheck échoue sur

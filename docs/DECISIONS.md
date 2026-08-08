@@ -149,6 +149,51 @@ la protection de `main`.
 
 ---
 
+## D-073 — Sept affirmations périmées, trouvées par l'agent d'un projet dérivé
+
+**Date** : 2026-08-07
+**Contexte** : le premier agent travaillant sur un produit issu de la graine a rendu, dans
+son état des lieux, une liste d'affirmations du dépôt **qu'il ne pouvait pas vérifier ou
+qui étaient fausses**. Cinq visaient la graine. Deux autres ont été trouvées en les
+corrigeant.
+
+| Affirmation | Où | Réalité |
+| --- | --- | --- |
+| `relationMode = "prisma"`, « les clés étrangères ne sont pas appliquées » | `.claude/rules/database.md` | retiré (D-065) |
+| « Le schéma contient un modèle de démonstration `Page` » | idem | supprimé (D-070) |
+| R-006 « build impossible sans `BASEHUB_TOKEN` », job `build-full` | squelette `RISKS.md` | BaseHub retiré (D-031) ; ni le job ni la variable n'existent |
+| R-008 « filtrage Sentry non implémenté » | squelette `RISKS.md` | `scrub.ts` existe, testé |
+| H-004 « `@prisma/adapter-neon` » | squelette `ASSUMPTIONS.md` | `@prisma/adapter-pg` (D-021) |
+| « le build est complet depuis le retrait de BaseHub » | `.claude/rules/deployment.md` | trouvée en corrigeant les cinq premières |
+| « `pnpm verify` … et build **complet** » | `docs/QUALITY_GATES.md` | **faux** : le build y était filtré sur `app`, `api`, `email` |
+
+**Les deux plus graves sont dans `.claude/rules/`**, et pas par hasard : ce dossier est lu
+par **tout agent à chaque tâche**. Une règle périmée n'y est pas seulement fausse, elle est
+**appliquée**. Celle sur `relationMode` faisait peser une discipline manuelle d'intégrité
+référentielle devenue inutile depuis que PostgreSQL l'applique.
+
+**`pnpm verify` a été rendu conforme plutôt que l'affirmation abaissée.** Il construit
+désormais tout. Coût mesuré : **33 secondes** pour un build complet, dont 8 tâches en
+cache. C'était le bon sens de la correction — `apps/web` a maintenant des tests et une
+frontière publique, le laisser hors du build local n'était plus défendable.
+
+**Le contrôle des textes destinés au repreneur est élargi** : comparaison insensible à la
+casse — la version précédente cherchait « BaseHub » et laissait passer « BASEHUB_TOKEN » —
+et il couvre désormais `.claude/rules/` en plus des squelettes. Il a immédiatement trouvé
+la sixième dérive.
+
+### Ce que ce cas confirme
+
+C'est le **deuxième** lot de dérives trouvé par un usage réel, après D-072. Deux jours de
+travail sur la graine, trois audits externes, et c'est un agent occupé à autre chose qui
+les voit — parce qu'il **lit ces textes pour agir**, pas pour les auditer. Un auditeur lit
+un document en le sachant audité ; un exécutant lui obéit.
+
+**La graine ne doit plus être corrigée depuis elle-même.** Chaque produit dérivé est
+désormais son meilleur banc d'essai.
+
+---
+
 ## D-072 — Le premier usage réel a fait échouer le premier `pnpm verify`
 
 **Date** : 2026-08-07
