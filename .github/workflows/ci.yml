@@ -62,6 +62,13 @@ jobs:
       - name: Tests du lanceur vibe0
         run: pnpm test:launcher
 
+      # Le manifeste est la source du plan de pilotage (D-074). S'il dérive, un
+      # tableau de bord affiche une composition fausse — et on s'y fie. Le
+      # contrôler ici est le seul endroit où la dérive ne peut pas passer :
+      # `pnpm verify` est local, et rien ne garantit qu'il ait été lancé.
+      - name: Manifeste à jour
+        run: pnpm manifest:check
+
       - name: Frontières entre workspaces
         run: pnpm boundaries
 
